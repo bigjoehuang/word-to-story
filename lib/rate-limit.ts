@@ -187,7 +187,7 @@ export async function checkRateLimitDB(
  */
 export function createRateLimitResponse(
   result: RateLimitResult,
-  message: string = '请求过于频繁，请稍后再试'
+  message: string = '请求过于频繁，请稍后再试试'
 ): NextResponse {
   const headers = new Headers()
   headers.set('X-RateLimit-Limit', '0')
@@ -218,14 +218,14 @@ export const RATE_LIMIT_CONFIGS = {
   GENERATE_STORY: {
     windowMs: 60 * 60 * 1000, // 1 小时
     maxRequests: 10,
-    message: '请求过于频繁，请稍后再试'
+    message: '请求过于频繁，请稍后再试！'
   },
   
   // 生成图片：每小时 20 次
   GENERATE_IMAGE: {
     windowMs: 60 * 60 * 1000, // 1 小时
     maxRequests: 20,
-    message: '图片生成请求过于频繁，请稍后再试'
+    message: '图片生成请求过于频繁，请稍后再试啊'
   },
   
   // 高亮操作：每分钟 30 次
@@ -253,7 +253,7 @@ export const RATE_LIMIT_CONFIGS = {
   GENERAL: {
     windowMs: 60 * 1000, // 1 分钟
     maxRequests: 60,
-    message: '请求过于频繁，请稍后再试'
+    message: '请求过于频繁，请稍后再试吧'
   }
 }
 

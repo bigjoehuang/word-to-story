@@ -96,16 +96,42 @@ export async function POST(request: NextRequest) {
       console.log(`[API验证通过] User ${deviceId} 剩余次数: ${dailyLimit - usedCount}/${dailyLimit}`)
     }
 
-    // Call DeepSeek API
-    const deepseekApiKey = process.env.DEEPSEEK_API_KEY
-    if (!deepseekApiKey) {
-      return createErrorResponse('DeepSeek API key 未配置', 500)
-    }
+    // 防止同一用户并行创作：获取生成锁
+    let lockAcquired = false
+    try {
+      const { error: lockError } = await supabaseAdmin
+        .from('generation_locks')
+        .insert({ user_id: deviceId })
 
-    const wordCount = trimmedWords.length
-    const wordDesc = wordCount === 1 ? '这个字' : wordCount === 2 ? '这两个字' : '这三个字'
-    
-    const prompt = `请根据"${trimmedWords}"${wordDesc}，用「简体中文」创作一个有趣又引人思考的短故事。故事应该：
+      // 如果已经存在相同 user_id 的记录（并发请求），数据库会返回唯一约束错误
+      if (lockError) {
+        // PostgreSQL 唯一约束错误代码 23505
+        const dbError = lockError as { code?: string; message?: string }
+        const isDuplicate =
+          dbError.code === '23505' ||
+          (typeof dbError.message === 'string' &&
+            dbError.message.includes('duplicate key value') &&
+            dbError.message.includes('generation_locks_pkey'))
+
+        if (isDuplicate) {
+          return createErrorResponse('正在为你创作上一个故事，请稍后再试', 429)
+        }
+
+        return handleDatabaseError(lockError, '获取创作锁失败')
+      }
+
+      lockAcquired = true
+
+      // Call DeepSeek API
+      const deepseekApiKey = process.env.DEEPSEEK_API_KEY
+      if (!deepseekApiKey) {
+        return createErrorResponse('DeepSeek API key 未配置', 500)
+      }
+
+      const wordCount = trimmedWords.length
+      const wordDesc = wordCount === 1 ? '这个字' : wordCount === 2 ? '这两个字' : '这三个字'
+      
+      const prompt = `请根据「${trimmedWords}」${wordDesc}，用「简体中文」创作一个有趣又引人思考的短故事。故事应该：
 1. 围绕${wordDesc}展开
 2. 有创意和想象力
 3. 能引发读者的思考
@@ -113,87 +139,105 @@ export async function POST(request: NextRequest) {
 
 请直接输出故事内容，不要包含标题或其他说明文字，也不要使用繁体中文。`
 
-    let response: Response
-    try {
-      response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${deepseekApiKey}`
-        },
-        body: JSON.stringify({
-          model: 'deepseek-chat',
-          messages: [
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          temperature: 0.8,
-          max_tokens: 1000
-        })
-      })
-    } catch (fetchError) {
-      return handleExternalApiError(fetchError, 'DeepSeek', '生成故事失败，请稍后重试')
-    }
-
-    if (!response.ok) {
-      let errorData: any
+      let response: Response
       try {
-        errorData = await response.json()
-      } catch {
-        const errorText = await response.text()
-        errorData = { error: { message: errorText } }
+        response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${deepseekApiKey}`
+          },
+          body: JSON.stringify({
+            model: 'deepseek-chat',
+            messages: [
+              {
+                role: 'user',
+                content: prompt
+              }
+            ],
+            temperature: 0.8,
+            max_tokens: 1000
+          })
+        })
+      } catch (fetchError) {
+        return handleExternalApiError(fetchError, 'DeepSeek', '生成故事失败，请稍后重试')
       }
-      
-      return handleExternalApiError(
-        errorData.error || errorData,
-        'DeepSeek',
-        '生成故事失败，请稍后重试'
-      )
-    }
 
-    const data = await response.json()
-    const storyContent = data.choices?.[0]?.message?.content?.trim()
+      if (!response.ok) {
+        let errorData: unknown
+        try {
+          errorData = await response.json()
+        } catch {
+          const errorText = await response.text()
+          errorData = { error: { message: errorText } }
+        }
+        
+        const errorPayload = (errorData as { error?: unknown })?.error || errorData
 
-    if (!storyContent) {
-      return createErrorResponse('生成的故事内容为空', 500)
-    }
+        return handleExternalApiError(
+          errorPayload,
+          'DeepSeek',
+          '生成故事失败，请稍后重试'
+        )
+      }
 
-    // 尝试获取当前用户的昵称（如果有的话），用于显示创作人
-    let authorNickname: string | null = null
-    try {
-      const { data: profile, error: profileError } = await supabaseAdmin
-        .from('profiles')
-        .select('nickname')
-        .eq('id', deviceId)
+      const data = await response.json()
+      const storyContent = data.choices?.[0]?.message?.content?.trim()
+
+      if (!storyContent) {
+        return createErrorResponse('生成的故事内容为空', 500)
+      }
+
+      // 尝试获取当前用户的昵称（如果有的话），用于显示创作人
+      let authorNickname: string | null = null
+      try {
+        const { data: profile, error: profileError } = await supabaseAdmin
+          .from('profiles')
+          .select('nickname')
+          .eq('id', deviceId)
+          .single()
+
+        if (!profileError && profile?.nickname) {
+          authorNickname = profile.nickname as string
+        }
+      } catch {
+        // 忽略昵称查询错误，不影响故事生成
+      }
+
+      // Save to database
+      const { data: story, error: dbError } = await supabaseAdmin
+        .from('stories')
+        .insert({
+          words: trimmedWords,
+          content: storyContent,
+          user_id: deviceId,
+          ip_address: null,
+          author_nickname: authorNickname
+        })
+        .select()
         .single()
 
-      if (!profileError && profile?.nickname) {
-        authorNickname = profile.nickname as string
+      if (dbError) {
+        return handleDatabaseError(dbError, '保存故事失败')
       }
-    } catch {
-      // 忽略昵称查询错误，不影响故事生成
+
+      return createSuccessResponse({ story: story as Story })
+    } finally {
+      if (lockAcquired) {
+        // 释放当前用户的创作锁，避免长时间占用
+        try {
+          await supabaseAdmin
+            .from('generation_locks')
+            .delete()
+            .eq('user_id', deviceId)
+        } catch {
+          // 删除锁失败时仅记录日志，不影响主流程响应
+          if (process.env.NODE_ENV === 'development') {
+            console.warn(`[API警告] 释放生成锁失败 user_id=${deviceId}`)
+          }
+        }
+      }
     }
-
-    // Save to database
-    const { data: story, error: dbError } = await supabaseAdmin
-      .from('stories')
-      .insert({
-        words: trimmedWords,
-        content: storyContent,
-        user_id: deviceId,
-        ip_address: null,
-        author_nickname: authorNickname
-      })
-      .select()
-      .single()
-
-    if (dbError) {
-      return handleDatabaseError(dbError, '保存故事失败')
-    }
-
-    return createSuccessResponse({ story: story as Story })
   } catch (error) {
     return handleDatabaseError(error, '服务器错误')
   }
