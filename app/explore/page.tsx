@@ -27,9 +27,11 @@ export default function ExplorePage() {
   const router = useRouter()
 
   useEffect(() => {
-    const fetchWords = async () => {
+    const fetchWords = async (showSkeleton: boolean) => {
       try {
-        setLoading(true)
+        if (showSkeleton) {
+          setLoading(true)
+        }
         const response = await fetch('/api/words')
         const data = await response.json()
         
@@ -49,7 +51,9 @@ export default function ExplorePage() {
       }
     }
 
-    // 如果有缓存（例如通过浏览器返回到本页），优先使用缓存并跳过请求
+    // 如果有缓存（例如通过浏览器返回到本页），优先使用缓存快速展示，
+    // 但仍然在后台再拉一次最新数据，以便有新增时自动刷新缓存
+    let hasCached = false
     if (typeof window !== 'undefined') {
       const cached = window.sessionStorage.getItem(WORDS_CACHE_KEY)
       if (cached) {
@@ -58,7 +62,7 @@ export default function ExplorePage() {
           if (Array.isArray(parsed) && parsed.length > 0) {
             setWords(parsed)
             setLoading(false)
-            return
+            hasCached = true
           }
         } catch {
           // ignore parse error and fall back to fetch
@@ -66,7 +70,8 @@ export default function ExplorePage() {
       }
     }
 
-    fetchWords()
+    // 如果没有缓存，展示骨架屏；如果已有缓存，仅在后台静默刷新
+    fetchWords(!hasCached)
   }, [])
 
   const handleWordClick = (word: string) => {

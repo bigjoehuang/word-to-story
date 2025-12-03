@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Sparkles, Loader2, X } from 'lucide-react'
 import TopBar from '@/components/TopBar'
@@ -21,6 +21,7 @@ export default function Home() {
   const [latestStory, setLatestStory] = useState<Story | null>(null)
   const [error, setError] = useState('')
   const [dailyLimit, setDailyLimit] = useState({ limit: 5, used: 0, remaining: 5 })
+  const isGeneratingRef = useRef(false)
 
   // Fetch daily limit
   useEffect(() => {
@@ -57,6 +58,12 @@ export default function Home() {
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault()
     
+    // 使用 ref 确保原子性检查，防止快速连续点击
+    if (isGeneratingRef.current) {
+      setError('正在生成故事，请等待上一次完成')
+      return
+    }
+    
     const trimmedWords = words.trim()
     if (trimmedWords.length === 0 || trimmedWords.length > 3) {
       setError('请输入1-3个字')
@@ -69,6 +76,8 @@ export default function Home() {
       return
     }
 
+    // 设置生成状态（同时更新 state 和 ref）
+    isGeneratingRef.current = true
     setLoading(true)
     setError('')
     const startTime = Date.now()
@@ -131,6 +140,7 @@ export default function Home() {
       console.error('Generate story error:', error)
       setError('网络错误，请稍后重试')
     } finally {
+      isGeneratingRef.current = false
       setLoading(false)
       setGenerationStartTime(0)
     }

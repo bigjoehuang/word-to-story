@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, Suspense, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   ArrowLeft,
-  RefreshCw,
   Loader2,
   BookOpen,
   Heart,
@@ -30,10 +29,12 @@ function ReadPageContent() {
   const [currentStoryIndex, setCurrentStoryIndex] = useState<number>(-1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // 记录当前会话中浏览过的故事索引（仅用于高亮/导航），真实"已读"数量使用 isRead 计算
   const [viewedIndices, setViewedIndices] = useState<Set<number>>(new Set())
   const [canMarkRead, setCanMarkRead] = useState(false)
   const [reGenerating, setReGenerating] = useState(false)
   const [reGenerateError, setReGenerateError] = useState('')
+  const isRegeneratingRef = useRef(false)
   const { fontFamily, fontSize } = useReadingSettings()
 
   // Fetch stories for the word
@@ -65,10 +66,9 @@ function ReadPageContent() {
               }
             }
 
-            // 否则随机选择一个故事
-            const randomIndex = Math.floor(Math.random() * storiesList.length)
-            setCurrentStoryIndex(randomIndex)
-            setViewedIndices(new Set([randomIndex]))
+            // 否则默认展示最新的第 1 个故事（index 0）
+            setCurrentStoryIndex(0)
+            setViewedIndices(new Set([0]))
           } else {
             setError('该字还没有故事')
           }
@@ -84,28 +84,6 @@ function ReadPageContent() {
 
     fetchStories()
   }, [word, storyIdFromQuery])
-
-  // 切换到下一个未读过的故事
-  const handleNextStory = () => {
-    if (stories.length === 0) return
-
-    // 获取未看过的故事索引
-    const unviewedIndices = stories
-      .map((_, index) => index)
-      .filter(index => !viewedIndices.has(index))
-
-    if (unviewedIndices.length === 0) {
-      // 如果所有故事都看过了，重置并随机选择一个
-      const randomIndex = Math.floor(Math.random() * stories.length)
-      setCurrentStoryIndex(randomIndex)
-      setViewedIndices(new Set([randomIndex]))
-    } else {
-      // 从未看过的故事中随机选择一个
-      const randomIndex = unviewedIndices[Math.floor(Math.random() * unviewedIndices.length)]
-      setCurrentStoryIndex(randomIndex)
-      setViewedIndices(prev => new Set([...prev, randomIndex]))
-    }
-  }
 
   // 处理点赞
   const handleLike = async (storyId: string, currentLikes: number) => {
@@ -131,7 +109,7 @@ function ReadPageContent() {
         body: JSON.stringify({ storyId, deviceId }),
       })
 
-      const data = await response.json()
+      const data: any = await response.json()
 
       if (response.ok) {
         localStorage.setItem('likedStories', JSON.stringify([...likedStories, storyId]))
@@ -159,7 +137,6 @@ function ReadPageContent() {
   }
 
   const currentStory = currentStoryIndex >= 0 ? stories[currentStoryIndex] : null
-  const hasMoreStories = stories.length > 1
 
   // 至少阅读 20 秒后才允许点击“读完”
   useEffect(() => {
@@ -173,13 +150,22 @@ function ReadPageContent() {
 
   // 再次创作当前字的故事（不会跳转页面）
   const handleRegenerate = async () => {
-    if (!word || loading || reGenerating) return
+    // 使用 ref 确保原子性检查，防止快速连续点击
+    if (isRegeneratingRef.current) {
+      setReGenerateError('正在再次创作中，请等待上一次完成')
+      return
+    }
+    
+    if (!word) return
     const trimmedWord = String(word).trim()
     if (!trimmedWord) return
 
+    // 设置生成状态（同时更新 state 和 ref）
+    isRegeneratingRef.current = true
+    setReGenerating(true)
+    setReGenerateError('')
+    
     try {
-      setReGenerating(true)
-      setReGenerateError('')
       const deviceId = getDeviceId()
       await ensureNickname()
 
@@ -216,6 +202,7 @@ function ReadPageContent() {
       console.error('Regenerate story error:', e)
       setReGenerateError('网络错误，请稍后重试')
     } finally {
+      isRegeneratingRef.current = false
       setReGenerating(false)
     }
   }
@@ -241,17 +228,6 @@ function ReadPageContent() {
               <ArrowLeft className="w-4 h-4" />
               返回探索
             </button>
-            
-            {hasMoreStories && (
-              <button
-                onClick={handleNextStory}
-                disabled={loading}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <RefreshCw className="w-4 h-4" />
-                不喜欢，换一个
-              </button>
-            )}
           </div>
 
           <div className="text-center">
@@ -262,7 +238,10 @@ function ReadPageContent() {
             <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-3">
               <p className="text-lg text-gray-600 dark:text-gray-300">
                 {stories.length > 0 && (
-                  <>共 {stories.length} 个故事 · 已看 {viewedIndices.size} 个</>
+                  <>
+                    共 {stories.length} 个故事 · 已读{' '}
+                    {stories.filter((story) => isRead(story.id)).length} 个
+                  </>
                 )}
               </p>
               {stories.length > 0 && (
@@ -278,6 +257,33 @@ function ReadPageContent() {
                 </motion.button>
               )}
             </div>
+
+            {/* 故事序号圆点，从新到旧 */}
+            {stories.length > 1 && (
+              <div className="mt-3 flex items-center justify-center gap-2">
+                {stories.map((_, index) => {
+                  const displayIndex = index + 1 // 1 开始
+                  const isActive = index === currentStoryIndex
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => {
+                        setCurrentStoryIndex(index)
+                        setViewedIndices(prev => new Set([...prev, index]))
+                      }}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold border transition-all duration-200 ${
+                        isActive
+                          ? 'bg-blue-500 text-white border-blue-500 shadow-sm'
+                          : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-400'
+                      }`}
+                    >
+                      {displayIndex}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
             {reGenerateError && (
               <p className="mt-2 text-sm text-red-500 dark:text-red-400">
                 {reGenerateError}
