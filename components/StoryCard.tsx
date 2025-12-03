@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { Heart, Clock, Image as ImageIcon, Loader2 } from 'lucide-react'
 import { Story } from '@/types/story'
 import HighlightableText from './HighlightableText'
+import { useReadingSettings, fontFamilyMap, fontSizeMap } from '@/lib/readingSettings'
 
 interface StoryCardProps {
   story: Story
@@ -26,6 +27,7 @@ export default function StoryCard({
   const liked = isLiked(story.id)
   const [generatingImage, setGeneratingImage] = useState(false)
   const [imageUrl, setImageUrl] = useState<string | null>(story.image_url || null)
+  const { fontFamily, fontSize } = useReadingSettings()
 
   // 同步 story.image_url 的变化（当从API获取新数据时）
   useEffect(() => {
@@ -154,7 +156,13 @@ export default function StoryCard({
         </motion.div>
       )}
       <div className="prose max-w-none dark:prose-invert">
-        <div className="text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
+        <div 
+          className="text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap"
+          style={{
+            fontFamily: fontFamilyMap[fontFamily],
+            fontSize: fontSizeMap[fontSize],
+          }}
+        >
           <HighlightableText 
             text={story.content}
             storyId={story.id}

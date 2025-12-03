@@ -12,6 +12,7 @@ import ThemeToggle from '@/components/ThemeToggle'
 import Navigation from '@/components/Navigation'
 import StorySkeleton from '@/components/StorySkeleton'
 import StoryCard from '@/components/StoryCard'
+import ReadingSettings from '@/components/ReadingSettings'
 import { Story, Pagination } from '@/types/story'
 import { formatDate, isLiked } from '@/lib/utils'
 
@@ -125,6 +126,7 @@ export default function ExplorePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 transition-colors duration-300">
       <ThemeToggle />
+      <ReadingSettings />
       
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Header */}
