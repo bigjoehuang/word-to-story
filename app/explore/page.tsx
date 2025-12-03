@@ -64,6 +64,15 @@ export default function ExplorePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const handleImageGenerated = (storyId: string, imageUrl: string) => {
+    // Update the story in stories list with the new image URL
+    setStories(prev => prev.map(story => 
+      story.id === storyId 
+        ? { ...story, image_url: imageUrl }
+        : story
+    ))
+  }
+
   const handleLike = async (storyId: string, currentLikes: number) => {
     const likedStories = JSON.parse(localStorage.getItem('likedStories') || '[]')
     if (likedStories.includes(storyId)) {
@@ -188,6 +197,7 @@ export default function ExplorePage() {
                     isLiked={isLiked}
                     formatDate={formatDate}
                     index={index}
+                    onImageGenerated={handleImageGenerated}
                   />
                 ))}
               </AnimatePresence>

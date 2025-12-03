@@ -5,7 +5,8 @@ CREATE TABLE IF NOT EXISTS stories (
   content TEXT NOT NULL,
   likes INTEGER DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  ip_address TEXT
+  ip_address TEXT,
+  image_url TEXT
 );
 
 -- Create index for faster queries

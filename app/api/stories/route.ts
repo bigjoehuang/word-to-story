@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('stories')
-      .select('id, words, content, likes, created_at', { count: 'exact' })
+      .select('id, words, content, likes, created_at, image_url', { count: 'exact' })
 
     // Add search filter
     if (search) {

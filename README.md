@@ -1,186 +1,140 @@
 # 字成故事 - Word to Story
 
-一个基于 Next.js、Supabase 和 DeepSeek AI 的故事生成应用。用户输入1-3个字，AI 会创作一个有趣又引人思考的故事，其他用户可以浏览并点赞。
+一个基于 Next.js 和 Supabase 的故事创作平台，用户可以输入1-3个字，AI会生成一个有趣且引人思考的故事。
 
 ## 功能特性
 
-- ✨ 输入1-3个字，AI 自动生成故事
-- 📖 浏览所有用户创作的故事
-- ❤️ 为喜欢的故事点赞
-- 🎨 现代化的 UI 设计
-- 🚀 部署在 Vercel，快速访问
+- ✅ 输入1-3个字生成故事（使用DeepSeek API）
+- ✅ 浏览和探索所有故事
+- ✅ 点赞功能
+- ✅ 每日创作限制（5次/天）
+- ✅ 文本划线功能（类似微信读书）
+- ✅ 在划线上发布想法
+- ✅ 故事配图生成（使用豆包大模型）
+- ✅ 深色/浅色模式
+- ✅ 无限滚动
+- ✅ 响应式设计
+- ✅ 动画效果
 
 ## 技术栈
 
 - **前端框架**: Next.js 14+ (App Router)
 - **数据库**: Supabase (PostgreSQL)
-- **AI 模型**: DeepSeek API
+- **AI模型**: DeepSeek (故事生成), 豆包大模型 (图片生成)
 - **样式**: Tailwind CSS
-- **部署**: Vercel
+- **动画**: Framer Motion
+- **图标**: Lucide React
 
-## 开始使用
+## 环境变量配置
 
-### 1. 克隆项目
-
-```bash
-git clone <your-repo-url>
-cd word-to-story
-```
-
-### 2. 安装依赖
-
-```bash
-npm install
-```
-
-### 3. 配置环境变量
-
-复制 `env.example` 文件为 `.env.local`：
-
-```bash
-cp env.example .env.local
-```
-
-然后编辑 `.env.local`，填入你的配置信息：
+创建 `.env.local` 文件，参考 `env.example`：
 
 ```env
 # Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
 # DeepSeek API Configuration
 DEEPSEEK_API_KEY=your_deepseek_api_key
+
+# 豆包大模型 API Configuration (for image generation)
+DOUBAO_ACCESS_KEY=your_doubao_access_key
+DOUBAO_SECRET_KEY=your_doubao_secret_key
+DOUBAO_ENDPOINT_ID=your_doubao_endpoint_id
 ```
 
-#### 获取 Supabase 配置
+## 数据库设置
 
-1. 访问 [Supabase](https://supabase.com) 并登录
-2. 创建新项目或选择现有项目
-3. 进入项目设置 → API
-4. 复制以下信息：
-   - **Project URL** → `NEXT_PUBLIC_SUPABASE_URL`
-   - **anon/public key** → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - **service_role key** → `SUPABASE_SERVICE_ROLE_KEY`
+1. 在 Supabase Dashboard 中执行 `supabase/schema.sql` 创建所有表
+2. 如果需要添加图片字段，执行 `supabase/migration_add_image_url.sql`
+3. 如果需要使用 Supabase Storage 存储图片，需要创建 `story-images` bucket：
+   - 进入 Supabase Dashboard > Storage
+   - 创建新 bucket 命名为 `story-images`
+   - 设置为公开访问（Public）
 
-#### 获取 DeepSeek API Key
+## 豆包API配置说明
 
-1. 访问 [DeepSeek](https://www.deepseek.com/) 并注册账号
-2. 进入 API 管理页面
-3. 创建 API Key
-4. 将 API Key 填入 `DEEPSEEK_API_KEY`
+1. 登录火山引擎控制台
+2. 搜索"豆包多模态大模型"，完成企业实名认证并开通服务
+3. 在"访问控制" > "密钥管理"中生成密钥对
+4. 获取 `ACCESS_KEY`、`SECRET_KEY` 和 `ENDPOINT_ID`
+5. 如果API返回401错误，可能需要实现火山引擎的签名认证（参考官方SDK）
 
-### 4. 设置 Supabase 数据库
-
-在 Supabase Dashboard 中，进入 SQL Editor，执行以下 SQL 创建表结构：
-
-```sql
--- Create stories table
-CREATE TABLE IF NOT EXISTS stories (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  words TEXT NOT NULL,
-  content TEXT NOT NULL,
-  likes INTEGER DEFAULT 0,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  ip_address TEXT
-);
-
--- Create index for faster queries
-CREATE INDEX IF NOT EXISTS idx_stories_created_at ON stories(created_at DESC);
-
--- Enable Row Level Security (RLS)
-ALTER TABLE stories ENABLE ROW LEVEL SECURITY;
-
--- Create policy to allow anyone to read stories
-CREATE POLICY "Allow public read access" ON stories
-  FOR SELECT
-  USING (true);
-
--- Create policy to allow anyone to insert stories
-CREATE POLICY "Allow public insert" ON stories
-  FOR INSERT
-  WITH CHECK (true);
-
--- Create policy to allow anyone to update likes
-CREATE POLICY "Allow public update likes" ON stories
-  FOR UPDATE
-  USING (true)
-  WITH CHECK (true);
-```
-
-或者直接运行项目根目录下的 `supabase/schema.sql` 文件。
-
-### 5. 运行开发服务器
+## 安装和运行
 
 ```bash
+# 安装依赖
+npm install
+
+# 开发模式
 npm run dev
+
+# 构建
+npm run build
+
+# 生产模式
+npm start
 ```
-
-打开 [http://localhost:3000](http://localhost:3000) 查看应用。
-
-## 部署到 Vercel
-
-### 使用 Vercel CLI
-
-1. 安装 Vercel CLI（如果还没有安装）：
-```bash
-npm i -g vercel
-```
-
-2. 登录 Vercel：
-```bash
-vercel login
-```
-
-3. 在项目根目录部署：
-```bash
-vercel
-```
-
-4. 配置环境变量：
-   - 访问 Vercel Dashboard
-   - 进入项目设置 → Environment Variables
-   - 添加所有环境变量（与 `.env.local` 中的相同）
-
-5. 重新部署以应用环境变量：
-```bash
-vercel --prod
-```
-
-### 使用 Vercel Dashboard
-
-1. 访问 [Vercel](https://vercel.com) 并登录
-2. 点击 "New Project"
-3. 导入你的 Git 仓库
-4. 在环境变量设置中添加所有必要的环境变量
-5. 点击 "Deploy"
 
 ## 项目结构
 
 ```
-word-to-story/
 ├── app/
 │   ├── api/
-│   │   ├── generate/      # 故事生成 API
-│   │   ├── like/          # 点赞 API
-│   │   └── stories/       # 获取故事列表 API
-│   ├── layout.tsx         # 根布局
-│   ├── page.tsx           # 主页
-│   └── globals.css        # 全局样式
+│   │   ├── generate/          # 生成故事
+│   │   ├── generate-image/    # 生成配图
+│   │   ├── like/              # 点赞
+│   │   ├── stories/           # 获取故事列表
+│   │   ├── limit/             # 每日限制
+│   │   ├── highlights/        # 划线管理
+│   │   └── thoughts/          # 想法管理
+│   ├── explore/               # 探索页面
+│   ├── page.tsx               # 主页面
+│   └── layout.tsx             # 根布局
+├── components/
+│   ├── StoryCard.tsx          # 故事卡片
+│   ├── HighlightableText.tsx   # 可划线文本
+│   ├── ThoughtInput.tsx       # 想法输入
+│   ├── GenerationProgress.tsx # 生成进度条
+│   └── ...
 ├── lib/
-│   └── supabase.ts        # Supabase 客户端配置
-├── supabase/
-│   └── schema.sql         # 数据库表结构
-├── env.example            # 环境变量示例
-└── README.md              # 项目说明
+│   ├── supabase.ts            # Supabase客户端
+│   └── utils.ts               # 工具函数
+└── supabase/
+    └── schema.sql             # 数据库schema
 ```
 
-## 注意事项
+## 功能说明
 
-- 点赞功能使用 IP 地址防止重复点赞，这是一个简单的实现方式
-- 生产环境建议使用更完善的用户认证系统
-- DeepSeek API 有调用限制，请注意使用频率
-- 确保 Supabase 的 RLS (Row Level Security) 策略已正确配置
+### 故事生成
+- 用户输入1-3个字
+- 调用DeepSeek API生成故事
+- 记录生成时间用于进度估算
+- 每日限制5次创作
+
+### 划线功能
+- 选择文本后可以添加下划线
+- 点击划线可以发布想法
+- 支持编辑和删除想法
+
+### 配图生成
+- 故事生成后，可以点击"生成配图"按钮
+- 使用豆包大模型根据故事内容生成配图
+- 图片保存到数据库或Supabase Storage
+
+## 部署
+
+### Vercel部署
+
+1. 将代码推送到GitHub
+2. 在Vercel中导入项目
+3. 配置环境变量
+4. 部署
+
+### 数据库迁移
+
+在Supabase Dashboard的SQL Editor中执行迁移文件。
 
 ## 许可证
 

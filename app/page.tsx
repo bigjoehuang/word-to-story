@@ -47,6 +47,17 @@ export default function Home() {
     }
   }, [])
 
+  const handleImageGenerated = (storyId: string, imageUrl: string) => {
+    // Update the story in myStories with the new image URL
+    const updatedStories = myStories.map(story => 
+      story.id === storyId 
+        ? { ...story, image_url: imageUrl }
+        : story
+    )
+    setMyStories(updatedStories)
+    localStorage.setItem('myStories', JSON.stringify(updatedStories))
+  }
+
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -304,6 +315,7 @@ export default function Home() {
                   isLiked={isLiked}
                   formatDate={formatDate}
                   index={index}
+                  onImageGenerated={handleImageGenerated}
                 />
               ))}
             </AnimatePresence>

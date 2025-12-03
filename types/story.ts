@@ -4,6 +4,7 @@ export interface Story {
   content: string
   likes: number
   created_at: string
+  image_url?: string | null
 }
 
 export interface Pagination {
