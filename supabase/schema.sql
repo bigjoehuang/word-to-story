@@ -56,3 +56,75 @@ CREATE POLICY "Allow public read generation times" ON generation_times
   FOR SELECT
   USING (true);
 
+-- Create highlights table for text highlighting/underlining
+CREATE TABLE IF NOT EXISTS highlights (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  story_id UUID NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+  text_content TEXT NOT NULL,
+  start_index INTEGER NOT NULL,
+  end_index INTEGER NOT NULL,
+  ip_address TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create index for faster queries
+CREATE INDEX IF NOT EXISTS idx_highlights_story_id ON highlights(story_id);
+CREATE INDEX IF NOT EXISTS idx_highlights_ip ON highlights(ip_address);
+
+-- Enable Row Level Security (RLS)
+ALTER TABLE highlights ENABLE ROW LEVEL SECURITY;
+
+-- Create policy to allow anyone to insert highlights
+CREATE POLICY "Allow public insert highlights" ON highlights
+  FOR INSERT
+  WITH CHECK (true);
+
+-- Create policy to allow anyone to read highlights
+CREATE POLICY "Allow public read highlights" ON highlights
+  FOR SELECT
+  USING (true);
+
+-- Create policy to allow anyone to delete their own highlights (by IP)
+CREATE POLICY "Allow public delete highlights" ON highlights
+  FOR DELETE
+  USING (true);
+
+-- Create thoughts table for storing thoughts/notes on highlights
+CREATE TABLE IF NOT EXISTS thoughts (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  highlight_id UUID NOT NULL REFERENCES highlights(id) ON DELETE CASCADE,
+  story_id UUID NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+  content TEXT NOT NULL,
+  ip_address TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create index for faster queries
+CREATE INDEX IF NOT EXISTS idx_thoughts_highlight_id ON thoughts(highlight_id);
+CREATE INDEX IF NOT EXISTS idx_thoughts_story_id ON thoughts(story_id);
+CREATE INDEX IF NOT EXISTS idx_thoughts_ip ON thoughts(ip_address);
+
+-- Enable Row Level Security (RLS)
+ALTER TABLE thoughts ENABLE ROW LEVEL SECURITY;
+
+-- Create policy to allow anyone to insert thoughts
+CREATE POLICY "Allow public insert thoughts" ON thoughts
+  FOR INSERT
+  WITH CHECK (true);
+
+-- Create policy to allow anyone to read thoughts
+CREATE POLICY "Allow public read thoughts" ON thoughts
+  FOR SELECT
+  USING (true);
+
+-- Create policy to allow anyone to update thoughts
+CREATE POLICY "Allow public update thoughts" ON thoughts
+  FOR UPDATE
+  USING (true)
+  WITH CHECK (true);
+
+-- Create policy to allow anyone to delete thoughts
+CREATE POLICY "Allow public delete thoughts" ON thoughts
+  FOR DELETE
+  USING (true);
+

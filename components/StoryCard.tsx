@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion'
 import { Heart, Clock } from 'lucide-react'
 import { Story } from '@/types/story'
+import HighlightableText from './HighlightableText'
 
 interface StoryCardProps {
   story: Story
@@ -62,9 +63,12 @@ export default function StoryCard({
         </motion.button>
       </div>
       <div className="prose max-w-none dark:prose-invert">
-        <p className="text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
-          {story.content}
-        </p>
+        <div className="text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
+          <HighlightableText 
+            text={story.content}
+            storyId={story.id}
+          />
+        </div>
       </div>
     </motion.div>
   )
