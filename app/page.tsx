@@ -6,12 +6,15 @@ import { Sparkles, Loader2, X } from 'lucide-react'
 import ThemeToggle from '@/components/ThemeToggle'
 import Navigation from '@/components/Navigation'
 import StoryCard from '@/components/StoryCard'
+import GenerationProgress from '@/components/GenerationProgress'
 import { Story } from '@/types/story'
 import { formatDate, isLiked } from '@/lib/utils'
+import { saveGenerationTime } from '@/lib/generationTime'
 
 export default function Home() {
   const [words, setWords] = useState('')
   const [loading, setLoading] = useState(false)
+  const [generationStartTime, setGenerationStartTime] = useState(0)
   const [myStories, setMyStories] = useState<Story[]>([])
   const [error, setError] = useState('')
   const [dailyLimit, setDailyLimit] = useState({ limit: 5, used: 0, remaining: 5 })
@@ -55,6 +58,8 @@ export default function Home() {
 
     setLoading(true)
     setError('')
+    const startTime = Date.now()
+    setGenerationStartTime(startTime)
 
     try {
       const response = await fetch('/api/generate', {
@@ -66,8 +71,13 @@ export default function Home() {
       })
 
       const data = await response.json()
+      const endTime = Date.now()
+      const duration = endTime - startTime
 
       if (response.ok) {
+        // Save generation time to database
+        await saveGenerationTime(duration)
+        
         // Add new story to the top of my stories
         const newStories = [data.story, ...myStories]
         setMyStories(newStories)
@@ -96,6 +106,7 @@ export default function Home() {
       setError('网络错误，请稍后重试')
     } finally {
       setLoading(false)
+      setGenerationStartTime(0)
     }
   }
 
@@ -241,6 +252,12 @@ export default function Home() {
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* Generation Progress */}
+            <GenerationProgress 
+              startTime={generationStartTime}
+              isGenerating={loading}
+            />
 
             <motion.button
               type="submit"
