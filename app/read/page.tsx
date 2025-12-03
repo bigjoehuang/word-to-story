@@ -270,8 +270,11 @@ function ReadPageContent() {
                   </motion.div>
                   <span className="font-semibold">{currentStory.likes}</span>
                 </motion.button>
-                <span className="text-sm text-gray-500 dark:text-gray-400">
-                  {new Date(currentStory.created_at).toLocaleDateString('zh-CN')}
+                <span className="text-sm text-gray-500 dark:text-gray-400 flex flex-col items-end text-right">
+                  {currentStory.author_nickname && (
+                    <span className="mb-1">创作人：{currentStory.author_nickname}</span>
+                  )}
+                  <span>{new Date(currentStory.created_at).toLocaleDateString('zh-CN')}</span>
                 </span>
               </div>
             </motion.div>

@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS stories (
   likes INTEGER DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   ip_address TEXT,
-  image_url TEXT
+  image_url TEXT,
+  author_nickname TEXT
 );
 
 -- Create index for faster queries
@@ -127,5 +128,20 @@ CREATE POLICY "Allow public update thoughts" ON thoughts
 -- Create policy to allow anyone to delete thoughts
 CREATE POLICY "Allow public delete thoughts" ON thoughts
   FOR DELETE
+  USING (true);
+
+-- Profiles table for nicknames (匿名用户档案)
+CREATE TABLE IF NOT EXISTS profiles (
+  id TEXT PRIMARY KEY, -- 对应 deviceId
+  nickname TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_profiles_nickname ON profiles(nickname);
+
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read profiles" ON profiles
+  FOR SELECT
   USING (true);
 

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MessageSquare, Send, X, Edit2, Trash2 } from 'lucide-react'
 import { getDeviceId } from '@/lib/deviceId'
+import { ensureNickname, fetchNicknameForDevice } from '@/lib/nickname'
 
 // 简单的内存缓存：按 highlightId 缓存想法列表
 // 刷新页面后会丢失，但可以显著减少同一会话内的重复请求卡顿
@@ -39,6 +40,7 @@ export default function ThoughtInput({
   const [editContent, setEditContent] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const currentDeviceId = getDeviceId() // 缓存设备ID，避免重复调用
+  const [nicknameMap, setNicknameMap] = useState<Record<string, string>>({})
 
   // Load existing thoughts（先用缓存同步显示，再异步刷新）
   useEffect(() => {
@@ -66,6 +68,21 @@ export default function ThoughtInput({
             thoughtCache.set(highlightId, newThoughts)
             setExistingThoughts(newThoughts)
           }
+
+          // 为这些想法的作者预加载昵称（包括自己和他人）
+          const userIds = Array.from(new Set(newThoughts.map(t => t.user_id).filter(Boolean))) as string[]
+          if (userIds.length > 0) {
+            ;(async () => {
+              const entries: [string, string][] = []
+              for (const uid of userIds) {
+                const name = uid === currentDeviceId
+                  ? (getDeviceId(), await ensureNickname())
+                  : (await fetchNicknameForDevice(uid)) || '一位读者'
+                entries.push([uid, name])
+              }
+              setNicknameMap(prev => ({ ...prev, ...Object.fromEntries(entries) }))
+            })()
+          }
         }
       } catch (error) {
         console.error('Failed to load thoughts:', error)
@@ -84,6 +101,9 @@ export default function ThoughtInput({
   const handleSave = async () => {
     const content = thought.trim()
     if (!content) return
+
+    // 确保当前用户已有昵称（会在需要时弹出 prompt）
+    await ensureNickname()
 
     // 乐观更新：先在本地插入一条“临时想法”，立刻反馈给用户
     const tempId = `temp-${Date.now()}`
@@ -316,7 +336,7 @@ export default function ThoughtInput({
                     </p>
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {formatDate(t.created_at)}
+                        {nicknameMap[t.user_id || ''] || (t.user_id === currentDeviceId ? '我' : '一位读者')} · {formatDate(t.created_at)}
                       </span>
                       {/* 只有主人可以编辑和删除想法 */}
                       {t.user_id === currentDeviceId && (

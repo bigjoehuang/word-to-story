@@ -15,10 +15,10 @@ export async function GET(request: NextRequest) {
 
     const trimmedWord = word.trim()
 
-    // 获取该字的所有故事
+    // 获取该字的所有故事（包含作者昵称）
     const { data: stories, error } = await supabase
       .from('stories')
-      .select('id, words, content, likes, created_at, image_url')
+      .select('id, words, content, likes, created_at, image_url, author_nickname')
       .eq('words', trimmedWord)
       .order('created_at', { ascending: false })
 

@@ -90,6 +90,11 @@ export default function StoryCard({
             <Clock className="w-3 h-3" />
             {formatDate(story.created_at)}
           </p>
+          {story.author_nickname && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              创作人：{story.author_nickname}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {!imageUrl && (

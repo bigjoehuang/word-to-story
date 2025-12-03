@@ -6,6 +6,7 @@ export interface Story {
   created_at: string
   image_url?: string | null
   user_id?: string
+  author_nickname?: string | null
 }
 
 // 使用统一的 Pagination 类型（从 types/api.ts）

@@ -58,6 +58,21 @@ export function sanitizeThoughtContent(text: string): string {
 }
 
 /**
+ * 清理昵称：
+ * - 移除 HTML / 危险内容（复用 sanitizeText / containsDangerousContent 逻辑）
+ * - 去掉首尾空格
+ * - 限制长度（默认 20）
+ */
+export function sanitizeNickname(text: string, maxLength: number = 20): string {
+  if (typeof text !== 'string') return ''
+  if (containsDangerousContent(text)) {
+    return ''
+  }
+  const cleaned = sanitizeText(text, maxLength)
+  return cleaned.trim()
+}
+
+/**
  * 验证文本是否包含潜在的危险内容
  */
 export function containsDangerousContent(text: string): boolean {

@@ -160,6 +160,22 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('生成的故事内容为空', 500)
     }
 
+    // 尝试获取当前用户的昵称（如果有的话），用于显示创作人
+    let authorNickname: string | null = null
+    try {
+      const { data: profile, error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .select('nickname')
+        .eq('id', deviceId)
+        .single()
+
+      if (!profileError && profile?.nickname) {
+        authorNickname = profile.nickname as string
+      }
+    } catch {
+      // 忽略昵称查询错误，不影响故事生成
+    }
+
     // Save to database
     const { data: story, error: dbError } = await supabaseAdmin
       .from('stories')
@@ -167,7 +183,8 @@ export async function POST(request: NextRequest) {
         words: trimmedWords,
         content: storyContent,
         user_id: deviceId,
-        ip_address: null
+        ip_address: null,
+        author_nickname: authorNickname
       })
       .select()
       .single()

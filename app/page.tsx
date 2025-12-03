@@ -12,6 +12,7 @@ import { Story } from '@/types/story'
 import { formatDate, isLiked } from '@/lib/utils'
 import { saveGenerationTime } from '@/lib/generationTime'
 import { getDeviceId } from '@/lib/deviceId'
+import { ensureNickname } from '@/lib/nickname'
 
 export default function Home() {
   const [words, setWords] = useState('')
@@ -75,6 +76,9 @@ export default function Home() {
 
     try {
       const deviceId = getDeviceId()
+
+      // 确保当前用户已有昵称（会在需要时提示设置一个，提供随机建议）
+      await ensureNickname()
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: {
