@@ -27,6 +27,7 @@ export default function HighlightableText({ text, storyId, className = '' }: Hig
   const [showHighlightMenu, setShowHighlightMenu] = useState(false)
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 })
   const [clickedHighlight, setClickedHighlight] = useState<{ id: string; position: { x: number; y: number } } | null>(null)
+  const [savingHighlight, setSavingHighlight] = useState(false)
   const textRef = useRef<HTMLDivElement>(null)
   const isSelectingRef = useRef(false)
   const currentDeviceId = getDeviceId() // 缓存设备ID，避免重复调用
@@ -137,7 +138,24 @@ export default function HighlightableText({ text, storyId, className = '' }: Hig
 
   // Save highlight
   const handleSaveHighlight = async () => {
-    if (!selectedRange) return
+    if (!selectedRange || savingHighlight) return
+
+    // 乐观更新：先在前端插入一条临时划线，立刻给用户反馈
+    const tempId = `temp-${Date.now()}`
+    const optimisticHighlight: Highlight = {
+      id: tempId,
+      text_content: selectedRange.text,
+      start_index: selectedRange.start,
+      end_index: selectedRange.end,
+      created_at: new Date().toISOString(),
+      user_id: currentDeviceId,
+    }
+
+    setHighlights((prev) => [...prev, optimisticHighlight])
+    setSavingHighlight(true)
+    setSelectedRange(null)
+    setShowHighlightMenu(false)
+    window.getSelection()?.removeAllRanges()
 
     try {
       const deviceId = getDeviceId()
@@ -158,13 +176,24 @@ export default function HighlightableText({ text, storyId, className = '' }: Hig
       const data = await response.json()
 
       if (response.ok && data.highlight) {
-        setHighlights(prev => [...prev, data.highlight])
-        setSelectedRange(null)
-        setShowHighlightMenu(false)
-        window.getSelection()?.removeAllRanges()
+        // 用服务端返回的真实数据替换临时划线
+        setHighlights((prev) =>
+          prev.map((h) => (h.id === tempId ? data.highlight as Highlight : h))
+        )
+      } else {
+        // 失败时撤回临时划线
+        setHighlights((prev) => prev.filter((h) => h.id !== tempId))
+        if (data?.error) {
+          alert(data.error)
+        }
       }
     } catch (error) {
       console.error('Failed to save highlight:', error)
+      // 网络错误同样撤回临时划线
+      setHighlights((prev) => prev.filter((h) => h.id !== tempId))
+      alert('保存划线失败，请稍后重试')
+    } finally {
+      setSavingHighlight(false)
     }
   }
 
@@ -345,10 +374,11 @@ export default function HighlightableText({ text, storyId, className = '' }: Hig
           >
             <button
               onClick={handleSaveHighlight}
-              className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-sm font-medium text-gray-700 dark:text-gray-300"
+              disabled={savingHighlight}
+              className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-sm font-medium text-gray-700 dark:text-gray-300 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <Underline className="w-4 h-4" />
-              添加下划线
+              {savingHighlight ? '添加中...' : '添加下划线'}
             </button>
           </motion.div>
         )}
