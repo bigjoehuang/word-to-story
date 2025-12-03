@@ -19,4 +19,20 @@ export function isLiked(storyId: string): boolean {
   return likedStories.includes(storyId)
 }
 
+// 判断当前设备是否已将某个故事标记为“读完”
+export function isRead(storyId: string): boolean {
+  if (typeof window === 'undefined') return false
+  const readStories = JSON.parse(localStorage.getItem('readStories') || '[]')
+  return readStories.includes(storyId)
+}
+
+// 将某个故事标记为“读完”（仅本设备）
+export function markRead(storyId: string) {
+  if (typeof window === 'undefined') return
+  const readStories = JSON.parse(localStorage.getItem('readStories') || '[]')
+  if (!readStories.includes(storyId)) {
+    localStorage.setItem('readStories', JSON.stringify([...readStories, storyId]))
+  }
+}
+
 

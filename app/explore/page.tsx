@@ -18,13 +18,14 @@ interface WordCount {
   count: number
 }
 
+const WORDS_CACHE_KEY = 'explore_words_cache'
+
 export default function ExplorePage() {
   const [words, setWords] = useState<WordCount[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const router = useRouter()
 
-  // Fetch words with counts
   useEffect(() => {
     const fetchWords = async () => {
       try {
@@ -33,7 +34,11 @@ export default function ExplorePage() {
         const data = await response.json()
         
         if (response.ok) {
-          setWords(data.words || [])
+          const list = data.words || []
+          setWords(list)
+          if (typeof window !== 'undefined') {
+            window.sessionStorage.setItem(WORDS_CACHE_KEY, JSON.stringify(list))
+          }
         } else {
           setError(data.error || '获取字列表失败')
         }
@@ -43,6 +48,24 @@ export default function ExplorePage() {
         setLoading(false)
       }
     }
+
+    // 如果有缓存（例如通过浏览器返回到本页），优先使用缓存并跳过请求
+    if (typeof window !== 'undefined') {
+      const cached = window.sessionStorage.getItem(WORDS_CACHE_KEY)
+      if (cached) {
+        try {
+          const parsed: WordCount[] = JSON.parse(cached)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setWords(parsed)
+            setLoading(false)
+            return
+          }
+        } catch {
+          // ignore parse error and fall back to fetch
+        }
+      }
+    }
+
     fetchWords()
   }, [])
 
