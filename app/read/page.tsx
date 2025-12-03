@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
@@ -17,7 +17,7 @@ import { Story } from '@/types/story'
 import { useReadingSettings, fontFamilyMap, fontSizeMap } from '@/lib/readingSettings'
 import { isLiked } from '@/lib/utils'
 
-export default function ReadPage() {
+function ReadPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const word = searchParams.get('word')
@@ -279,6 +279,24 @@ export default function ReadPage() {
         ) : null}
       </div>
     </div>
+  )
+}
+
+export default function ReadPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 transition-colors duration-300">
+        <ThemeToggle />
+        <ReadingSettings />
+        <div className="container mx-auto px-4 py-8 max-w-4xl">
+          <div className="flex justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+          </div>
+        </div>
+      </div>
+    }>
+      <ReadPageContent />
+    </Suspense>
   )
 }
 
