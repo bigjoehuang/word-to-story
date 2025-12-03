@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { createErrorResponse, createSuccessResponse, validateDeviceId, validateUUID, handleDatabaseError } from '@/lib/api-utils'
+import { sanitizeHighlightText, sanitizeAndValidate } from '@/lib/xss-protection'
 
 // Save highlight
 export async function POST(request: NextRequest) {
@@ -13,6 +14,12 @@ export async function POST(request: NextRequest) {
 
     if (!textContent || typeof textContent !== 'string' || textContent.trim().length === 0) {
       return createErrorResponse('文本内容不能为空', 400)
+    }
+
+    // XSS 防护：清理和验证文本内容
+    const sanitizedText = sanitizeHighlightText(textContent.trim())
+    if (sanitizedText.length === 0) {
+      return createErrorResponse('文本内容包含无效字符', 400)
     }
 
     if (typeof startIndex !== 'number' || typeof endIndex !== 'number') {
@@ -31,7 +38,7 @@ export async function POST(request: NextRequest) {
       .from('highlights')
       .insert({
         story_id: storyId,
-        text_content: textContent.trim(),
+        text_content: sanitizedText,
         start_index: startIndex,
         end_index: endIndex,
         user_id: deviceId,

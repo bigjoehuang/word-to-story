@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { createErrorResponse, createSuccessResponse, validateDeviceId, validateUUID, handleDatabaseError } from '@/lib/api-utils'
+import { sanitizeThoughtContent, sanitizeAndValidate } from '@/lib/xss-protection'
 
 // Save thought
 export async function POST(request: NextRequest) {
@@ -15,6 +16,12 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('内容不能为空', 400)
     }
 
+    // XSS 防护：清理和验证内容
+    const sanitizedContent = sanitizeThoughtContent(content.trim())
+    if (sanitizedContent.length === 0) {
+      return createErrorResponse('内容包含无效字符', 400)
+    }
+
     if (!validateDeviceId(deviceId)) {
       return createErrorResponse('缺少设备ID', 400)
     }
@@ -24,7 +31,7 @@ export async function POST(request: NextRequest) {
       .insert({
         highlight_id: highlightId,
         story_id: storyId,
-        content: content.trim(),
+        content: sanitizedContent,
         user_id: deviceId,
         ip_address: null
       })
@@ -94,6 +101,12 @@ export async function PUT(request: NextRequest) {
       return createErrorResponse('内容不能为空', 400)
     }
 
+    // XSS 防护：清理和验证内容
+    const sanitizedContent = sanitizeThoughtContent(content.trim())
+    if (sanitizedContent.length === 0) {
+      return createErrorResponse('内容包含无效字符', 400)
+    }
+
     if (!validateDeviceId(deviceId)) {
       return createErrorResponse('缺少设备ID', 400)
     }
@@ -116,7 +129,7 @@ export async function PUT(request: NextRequest) {
 
     const { data, error } = await supabaseAdmin
       .from('thoughts')
-      .update({ content: content.trim() })
+      .update({ content: sanitizedContent })
       .eq('id', thoughtId)
       .eq('user_id', deviceId)
       .select()

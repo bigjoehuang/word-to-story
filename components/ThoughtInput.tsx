@@ -242,7 +242,10 @@ export default function ThoughtInput({
                   </div>
                 ) : (
                   <>
-                    <p className="text-gray-700 dark:text-gray-300 mb-1">{t.content}</p>
+                    {/* XSS 防护：React 会自动转义，但为了安全，确保内容已清理 */}
+                    <p className="text-gray-700 dark:text-gray-300 mb-1 whitespace-pre-wrap break-words">
+                      {t.content}
+                    </p>
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-gray-500 dark:text-gray-400">
                         {formatDate(t.created_at)}
