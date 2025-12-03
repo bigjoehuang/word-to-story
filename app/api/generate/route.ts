@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
                'unknown'
 
     // Check daily limit (5 stories per IP per day)
+    // 这个检查必须在调用 DeepSeek API 之前进行，确保 API 有拦截
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const tomorrow = new Date(today)
@@ -39,22 +40,40 @@ export async function POST(request: NextRequest) {
       .gte('created_at', today.toISOString())
       .lt('created_at', tomorrow.toISOString())
 
+    const dailyLimit = 5
+    
+    // 如果查询失败，为了安全起见，拒绝请求
     if (countError) {
       console.error('Count stories error:', countError)
-      // Continue even if count fails, but log the error
-    }
-
-    const dailyLimit = 5
-    if (count !== null && count >= dailyLimit) {
       return NextResponse.json(
         { 
-          error: `今日创作次数已达上限（${dailyLimit}次），请明天再试`,
+          error: '无法验证创作次数限制，请稍后重试',
           limit: dailyLimit,
-          used: count
+          used: 0
+        },
+        { status: 500 }
+      )
+    }
+
+    // 确保 count 不为 null，如果为 null 则视为 0
+    const usedCount = count ?? 0
+    
+    // 严格检查：如果已达到或超过限制，立即拦截
+    // 这个拦截确保即使前端验证被绕过，API 也会拒绝请求
+    if (usedCount >= dailyLimit) {
+      console.log(`[API拦截] Daily limit reached for IP ${ip}: ${usedCount}/${dailyLimit}`)
+      return NextResponse.json(
+        { 
+          error: '今日创作次数已用完，请明天再试',
+          limit: dailyLimit,
+          used: usedCount,
+          remaining: 0
         },
         { status: 429 } // 429 Too Many Requests
       )
     }
+    
+    console.log(`[API验证通过] IP ${ip} 剩余次数: ${dailyLimit - usedCount}/${dailyLimit}`)
 
     // Call DeepSeek API
     const deepseekApiKey = process.env.DEEPSEEK_API_KEY

@@ -58,23 +58,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       // 强制触发重绘
       root.style.colorScheme = newTheme === 'dark' ? 'dark' : 'light'
       
-      // 调试信息
-      console.log('Theme applied:', newTheme)
-      console.log('HTML classes:', root.className)
-      console.log('HTML has dark class:', root.classList.contains('dark'))
-      console.log('Body has dark class:', document.body.classList.contains('dark'))
-      console.log('Computed background:', window.getComputedStyle(document.body).backgroundColor)
-      console.log('Computed color:', window.getComputedStyle(document.body).color)
-      
-      // 检查 Tailwind dark mode 是否工作
-      const testEl = document.createElement('div')
-      testEl.className = 'bg-white dark:bg-gray-800'
-      testEl.style.position = 'absolute'
-      testEl.style.visibility = 'hidden'
-      document.body.appendChild(testEl)
-      const computed = window.getComputedStyle(testEl)
-      console.log('Test element background (should change with theme):', computed.backgroundColor)
-      document.body.removeChild(testEl)
+      // 使用 requestAnimationFrame 确保平滑过渡
+      requestAnimationFrame(() => {
+        // 强制浏览器重新计算样式，确保过渡平滑
+        void root.offsetHeight
+      })
     } catch (error) {
       console.error('Error applying theme:', error)
     }

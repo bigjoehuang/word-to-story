@@ -68,6 +68,12 @@ export default function Home() {
       return
     }
 
+    // 前端也检查一次，提供更好的用户体验
+    if (dailyLimit.remaining === 0) {
+      setError('今日创作次数已用完，请明天再试')
+      return
+    }
+
     setLoading(true)
     setError('')
     const startTime = Date.now()
@@ -103,8 +109,11 @@ export default function Home() {
           setDailyLimit(limitData)
         }
       } else {
+        // API 拦截：处理 429 状态码（达到限制）
         if (response.status === 429) {
-          setError(data.error || '今日创作次数已达上限')
+          const errorMessage = data.error || '今日创作次数已达上限，请明天再试'
+          setError(errorMessage)
+          // 立即刷新限制信息
           const limitResponse = await fetch('/api/limit')
           const limitData = await limitResponse.json()
           if (limitResponse.ok) {
@@ -114,7 +123,8 @@ export default function Home() {
           setError(data.error || '生成故事失败')
         }
       }
-    } catch {
+    } catch (error) {
+      console.error('Generate story error:', error)
       setError('网络错误，请稍后重试')
     } finally {
       setLoading(false)

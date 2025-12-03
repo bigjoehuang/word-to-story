@@ -35,7 +35,13 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition: background-color 0.15s ease-out, color 0.15s ease-out;
+  /* 优化字体渲染，减少闪烁 */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  /* 优化主题切换性能 */
+  will-change: background-color, color;
 }
 
 /* 确保深色模式下 body 有正确的背景色 */
@@ -44,9 +50,50 @@ html.dark body {
   color: #ededed;
 }
 
-/* 确保所有元素都支持平滑的主题过渡 */
-* {
+/* 优化主题切换过渡，减少字体闪烁 */
+*,
+*::before,
+*::after {
   transition-property: background-color, border-color, color, fill, stroke;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+  transition-duration: 120ms;
+}
+
+/* 文字元素使用更快的过渡，减少闪烁感 */
+p,
+span,
+div,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+a,
+label,
+li,
+td,
+th {
+  transition-property: color;
+  transition-duration: 100ms;
+  transition-timing-function: ease-out;
+}
+
+/* 排除不需要过渡的元素 */
+svg,
+img,
+canvas,
+video,
+iframe {
+  transition: none;
+}
+
+/* 输入框和按钮使用更平滑的过渡 */
+input,
+button,
+textarea,
+select {
+  transition-property: background-color, border-color, color;
+  transition-duration: 200ms;
+  transition-timing-function: ease-out;
 }
