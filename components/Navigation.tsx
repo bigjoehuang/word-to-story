@@ -26,8 +26,6 @@ export default function Navigation() {
           </motion.button>
         </Link>
 
-
-
         <Link href="/my-stories">
           <motion.button
             className={`px-6 py-2 rounded-lg transition-all duration-200 flex items-center gap-2 ${
@@ -57,9 +55,9 @@ export default function Navigation() {
             探索
           </motion.button>
         </Link>
-
       </div>
     </nav>
   )
 }
+
 

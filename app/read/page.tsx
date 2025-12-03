@@ -10,7 +10,7 @@ import {
   BookOpen,
   Heart
 } from 'lucide-react'
-import ThemeToggle from '@/components/ThemeToggle'
+import TopBar from '@/components/TopBar'
 import ReadingSettings from '@/components/ReadingSettings'
 import HighlightableText from '@/components/HighlightableText'
 import { Story } from '@/types/story'
@@ -145,7 +145,7 @@ function ReadPageContent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 transition-colors duration-300">
-      <ThemeToggle />
+      <TopBar />
       <ReadingSettings />
       
       <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -289,7 +289,7 @@ export default function ReadPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 transition-colors duration-300">
-        <ThemeToggle />
+        <TopBar />
         <ReadingSettings />
         <div className="container mx-auto px-4 py-8 max-w-4xl">
           <div className="flex justify-center py-12">

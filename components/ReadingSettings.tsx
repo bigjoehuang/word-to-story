@@ -27,7 +27,7 @@ export default function ReadingSettings() {
   }
 
   return (
-    <div className="fixed top-4 right-20 z-50">
+    <div className="fixed top-16 right-20 z-50">
       <div className="relative">
         <motion.button
           onClick={() => setShowMenu(!showMenu)}
