@@ -20,9 +20,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get device user ID from request body
-    const { deviceId } = await request.json()
-    
+    // Validate device ID
     if (!deviceId || typeof deviceId !== 'string') {
       return NextResponse.json(
         { error: '缺少设备ID' },
