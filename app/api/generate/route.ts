@@ -105,13 +105,13 @@ export async function POST(request: NextRequest) {
     const wordCount = trimmedWords.length
     const wordDesc = wordCount === 1 ? '这个字' : wordCount === 2 ? '这两个字' : '这三个字'
     
-    const prompt = `请根据"${trimmedWords}"${wordDesc}，创作一个有趣又引人思考的短故事。故事应该：
+    const prompt = `请根据"${trimmedWords}"${wordDesc}，用「简体中文」创作一个有趣又引人思考的短故事。故事应该：
 1. 围绕${wordDesc}展开
 2. 有创意和想象力
 3. 能引发读者的思考
 4. 长度控制在300-500字左右
 
-请直接输出故事内容，不要包含标题或其他说明文字。`
+请直接输出故事内容，不要包含标题或其他说明文字，也不要使用繁体中文。`
 
     let response: Response
     try {
