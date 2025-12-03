@@ -12,6 +12,7 @@ interface Highlight {
   start_index: number
   end_index: number
   created_at?: string
+  user_id?: string
 }
 
 interface HighlightableTextProps {
@@ -28,6 +29,7 @@ export default function HighlightableText({ text, storyId, className = '' }: Hig
   const [clickedHighlight, setClickedHighlight] = useState<{ id: string; position: { x: number; y: number } } | null>(null)
   const textRef = useRef<HTMLDivElement>(null)
   const isSelectingRef = useRef(false)
+  const currentDeviceId = getDeviceId() // 缓存设备ID，避免重复调用
 
   // Load highlights from database
   useEffect(() => {
@@ -169,19 +171,24 @@ export default function HighlightableText({ text, storyId, className = '' }: Hig
   // Delete highlight
   const handleDeleteHighlight = async (highlightId: string) => {
     try {
+      const deviceId = getDeviceId()
       const response = await fetch('/api/highlights', {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ highlightId }),
+        body: JSON.stringify({ highlightId, deviceId }),
       })
 
       if (response.ok) {
         setHighlights(prev => prev.filter(h => h.id !== highlightId))
+      } else {
+        const data = await response.json()
+        alert(data.error || '删除失败')
       }
     } catch (error) {
       console.error('Failed to delete highlight:', error)
+      alert('删除失败，请稍后重试')
     }
   }
 
@@ -269,25 +276,28 @@ export default function HighlightableText({ text, storyId, className = '' }: Hig
               >
                 <MessageSquare className="w-3 h-3" />
               </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  e.preventDefault()
-                  handleDeleteHighlight(highlight.id)
-                }}
-                onMouseDown={(e) => {
-                  e.stopPropagation()
-                  e.preventDefault()
-                }}
-                onMouseUp={(e) => {
-                  e.stopPropagation()
-                  e.preventDefault()
-                }}
-                className="bg-red-500 text-white rounded-full p-1 shadow-lg hover:bg-red-600 pointer-events-auto"
-                title="删除划线"
-              >
-                <X className="w-3 h-3" />
-              </button>
+              {/* 只有主人可以删除划线 */}
+              {highlight.user_id === currentDeviceId && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    handleDeleteHighlight(highlight.id)
+                  }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                  }}
+                  onMouseUp={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                  }}
+                  className="bg-red-500 text-white rounded-full p-1 shadow-lg hover:bg-red-600 pointer-events-auto"
+                  title="删除划线"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
             </div>
           </mark>
         )

@@ -10,6 +10,7 @@ interface Thought {
   highlight_id: string
   content: string
   created_at: string
+  user_id?: string
 }
 
 interface ThoughtInputProps {
@@ -33,6 +34,7 @@ export default function ThoughtInput({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editContent, setEditContent] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const currentDeviceId = getDeviceId() // 缓存设备ID，避免重复调用
 
   // Load existing thoughts
   useEffect(() => {
@@ -100,6 +102,7 @@ export default function ThoughtInput({
 
     setLoading(true)
     try {
+      const deviceId = getDeviceId()
       const response = await fetch('/api/thoughts', {
         method: 'PUT',
         headers: {
@@ -107,7 +110,8 @@ export default function ThoughtInput({
         },
         body: JSON.stringify({
           thoughtId,
-          content
+          content,
+          deviceId
         }),
       })
 
@@ -119,9 +123,12 @@ export default function ThoughtInput({
         ))
         setEditingId(null)
         setEditContent('')
+      } else {
+        alert(data.error || '更新失败')
       }
     } catch (error) {
       console.error('Failed to update thought:', error)
+      alert('更新失败，请稍后重试')
     } finally {
       setLoading(false)
     }
@@ -129,19 +136,24 @@ export default function ThoughtInput({
 
   const handleDelete = async (thoughtId: string) => {
     try {
+      const deviceId = getDeviceId()
       const response = await fetch('/api/thoughts', {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ thoughtId }),
+        body: JSON.stringify({ thoughtId, deviceId }),
       })
 
       if (response.ok) {
         setExistingThoughts(prev => prev.filter(t => t.id !== thoughtId))
+      } else {
+        const data = await response.json()
+        alert(data.error || '删除失败')
       }
     } catch (error) {
       console.error('Failed to delete thought:', error)
+      alert('删除失败，请稍后重试')
     }
   }
 
@@ -235,25 +247,28 @@ export default function ThoughtInput({
                       <span className="text-xs text-gray-500 dark:text-gray-400">
                         {formatDate(t.created_at)}
                       </span>
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => {
-                            setEditingId(t.id)
-                            setEditContent(t.content)
-                          }}
-                          className="p-1 text-gray-400 hover:text-blue-500 transition-colors"
-                          title="编辑"
-                        >
-                          <Edit2 className="w-3 h-3" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(t.id)}
-                          className="p-1 text-gray-400 hover:text-red-500 transition-colors"
-                          title="删除"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
+                      {/* 只有主人可以编辑和删除想法 */}
+                      {t.user_id === currentDeviceId && (
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => {
+                              setEditingId(t.id)
+                              setEditContent(t.content)
+                            }}
+                            className="p-1 text-gray-400 hover:text-blue-500 transition-colors"
+                            title="编辑"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(t.id)}
+                            className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                            title="删除"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </>
                 )}
