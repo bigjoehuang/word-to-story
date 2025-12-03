@@ -1,23 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { createErrorResponse, createSuccessResponse, validateDeviceId, handleDatabaseError } from '@/lib/api-utils'
 
 // Save generation time
 export async function POST(request: NextRequest) {
   try {
     const { duration, deviceId } = await request.json()
 
-    if (!duration || typeof duration !== 'number' || duration < 0) {
-      return NextResponse.json(
-        { error: '无效的耗时数据' },
-        { status: 400 }
-      )
+    if (typeof duration !== 'number' || duration < 0 || !isFinite(duration)) {
+      return createErrorResponse('无效的耗时数据', 400)
     }
 
-    if (!deviceId || typeof deviceId !== 'string') {
-      return NextResponse.json(
-        { error: '缺少设备ID' },
-        { status: 400 }
-      )
+    if (!validateDeviceId(deviceId)) {
+      return createErrorResponse('缺少设备ID', 400)
     }
 
     const { data, error } = await supabaseAdmin
@@ -25,26 +20,18 @@ export async function POST(request: NextRequest) {
       .insert({
         duration_ms: Math.round(duration),
         user_id: deviceId,
-        ip_address: null // 保留字段但不再使用
+        ip_address: null
       })
       .select()
       .single()
 
     if (error) {
-      console.error('Save generation time error:', error)
-      return NextResponse.json(
-        { error: '保存耗时记录失败' },
-        { status: 500 }
-      )
+      return handleDatabaseError(error, '保存耗时记录失败')
     }
 
-    return NextResponse.json({ success: true, data }, { status: 200 })
+    return createSuccessResponse({ data })
   } catch (error) {
-    console.error('Save generation time error:', error)
-    return NextResponse.json(
-      { error: '服务器错误' },
-      { status: 500 }
-    )
+    return handleDatabaseError(error, '服务器错误')
   }
 }
 
@@ -52,7 +39,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
-    const limit = parseInt(searchParams.get('limit') || '20')
+    const limit = Math.max(1, Math.min(100, parseInt(searchParams.get('limit') || '20', 10)))
 
     const { data, error } = await supabaseAdmin
       .from('generation_times')
@@ -61,23 +48,15 @@ export async function GET(request: NextRequest) {
       .limit(limit)
 
     if (error) {
-      console.error('Get generation times error:', error)
-      return NextResponse.json(
-        { error: '获取耗时记录失败' },
-        { status: 500 }
-      )
+      return handleDatabaseError(error, '获取耗时记录失败')
     }
 
-    return NextResponse.json({ 
+    return createSuccessResponse({ 
       times: data || [],
       count: data?.length || 0
-    }, { status: 200 })
+    })
   } catch (error) {
-    console.error('Get generation times error:', error)
-    return NextResponse.json(
-      { error: '服务器错误' },
-      { status: 500 }
-    )
+    return handleDatabaseError(error, '服务器错误')
   }
 }
 

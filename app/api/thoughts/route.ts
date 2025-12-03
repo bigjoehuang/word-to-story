@@ -1,24 +1,22 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { createErrorResponse, createSuccessResponse, validateDeviceId, validateUUID, handleDatabaseError } from '@/lib/api-utils'
 
 // Save thought
 export async function POST(request: NextRequest) {
   try {
     const { highlightId, storyId, content, deviceId } = await request.json()
 
-    if (!highlightId || !storyId || !content || typeof content !== 'string' || content.trim().length === 0) {
-      return NextResponse.json(
-        { error: '缺少必要的参数或内容为空' },
-        { status: 400 }
-      )
+    if (!validateUUID(highlightId) || !validateUUID(storyId)) {
+      return createErrorResponse('缺少必要的参数', 400)
     }
 
-    // Validate device ID
-    if (!deviceId || typeof deviceId !== 'string') {
-      return NextResponse.json(
-        { error: '缺少设备ID' },
-        { status: 400 }
-      )
+    if (!content || typeof content !== 'string' || content.trim().length === 0) {
+      return createErrorResponse('内容不能为空', 400)
+    }
+
+    if (!validateDeviceId(deviceId)) {
+      return createErrorResponse('缺少设备ID', 400)
     }
 
     const { data, error } = await supabaseAdmin
@@ -28,26 +26,18 @@ export async function POST(request: NextRequest) {
         story_id: storyId,
         content: content.trim(),
         user_id: deviceId,
-        ip_address: null // 保留字段但不再使用
+        ip_address: null
       })
       .select()
       .single()
 
     if (error) {
-      console.error('Save thought error:', error)
-      return NextResponse.json(
-        { error: '保存想法失败' },
-        { status: 500 }
-      )
+      return handleDatabaseError(error, '保存想法失败')
     }
 
-    return NextResponse.json({ success: true, thought: data }, { status: 200 })
+    return createSuccessResponse({ thought: data })
   } catch (error) {
-    console.error('Save thought error:', error)
-    return NextResponse.json(
-      { error: '服务器错误' },
-      { status: 500 }
-    )
+    return handleDatabaseError(error, '服务器错误')
   }
 }
 
@@ -59,10 +49,7 @@ export async function GET(request: NextRequest) {
     const storyId = searchParams.get('storyId')
 
     if (!highlightId && !storyId) {
-      return NextResponse.json(
-        { error: '缺少 highlightId 或 storyId 参数' },
-        { status: 400 }
-      )
+      return createErrorResponse('缺少 highlightId 或 storyId 参数', 400)
     }
 
     let query = supabaseAdmin
@@ -71,30 +58,26 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
 
     if (highlightId) {
+      if (!validateUUID(highlightId)) {
+        return createErrorResponse('无效的 highlightId 参数', 400)
+      }
       query = query.eq('highlight_id', highlightId)
     } else if (storyId) {
+      if (!validateUUID(storyId)) {
+        return createErrorResponse('无效的 storyId 参数', 400)
+      }
       query = query.eq('story_id', storyId)
     }
 
     const { data, error } = await query
 
     if (error) {
-      console.error('Get thoughts error:', error)
-      return NextResponse.json(
-        { error: '获取想法失败' },
-        { status: 500 }
-      )
+      return handleDatabaseError(error, '获取想法失败')
     }
 
-    return NextResponse.json({ 
-      thoughts: data || []
-    }, { status: 200 })
+    return createSuccessResponse({ thoughts: data || [] })
   } catch (error) {
-    console.error('Get thoughts error:', error)
-    return NextResponse.json(
-      { error: '服务器错误' },
-      { status: 500 }
-    )
+    return handleDatabaseError(error, '服务器错误')
   }
 }
 
@@ -103,18 +86,16 @@ export async function PUT(request: NextRequest) {
   try {
     const { thoughtId, content, deviceId } = await request.json()
 
-    if (!thoughtId || !content || typeof content !== 'string' || content.trim().length === 0) {
-      return NextResponse.json(
-        { error: '缺少必要的参数或内容为空' },
-        { status: 400 }
-      )
+    if (!validateUUID(thoughtId)) {
+      return createErrorResponse('缺少或无效的 thoughtId 参数', 400)
     }
 
-    if (!deviceId || typeof deviceId !== 'string') {
-      return NextResponse.json(
-        { error: '缺少设备ID' },
-        { status: 400 }
-      )
+    if (!content || typeof content !== 'string' || content.trim().length === 0) {
+      return createErrorResponse('内容不能为空', 400)
+    }
+
+    if (!validateDeviceId(deviceId)) {
+      return createErrorResponse('缺少设备ID', 400)
     }
 
     // 首先检查想法是否存在，以及是否是当前用户创建的
@@ -125,43 +106,29 @@ export async function PUT(request: NextRequest) {
       .single()
 
     if (fetchError || !existingThought) {
-      return NextResponse.json(
-        { error: '想法不存在' },
-        { status: 404 }
-      )
+      return createErrorResponse('想法不存在', 404)
     }
 
     // 检查是否是想法的主人
     if (existingThought.user_id !== deviceId) {
-      return NextResponse.json(
-        { error: '无权编辑此想法，只有创建者可以编辑' },
-        { status: 403 }
-      )
+      return createErrorResponse('无权编辑此想法，只有创建者可以编辑', 403)
     }
 
     const { data, error } = await supabaseAdmin
       .from('thoughts')
       .update({ content: content.trim() })
       .eq('id', thoughtId)
-      .eq('user_id', deviceId) // 双重检查
+      .eq('user_id', deviceId)
       .select()
       .single()
 
     if (error) {
-      console.error('Update thought error:', error)
-      return NextResponse.json(
-        { error: '更新想法失败' },
-        { status: 500 }
-      )
+      return handleDatabaseError(error, '更新想法失败')
     }
 
-    return NextResponse.json({ success: true, thought: data }, { status: 200 })
+    return createSuccessResponse({ thought: data })
   } catch (error) {
-    console.error('Update thought error:', error)
-    return NextResponse.json(
-      { error: '服务器错误' },
-      { status: 500 }
-    )
+    return handleDatabaseError(error, '服务器错误')
   }
 }
 
@@ -170,18 +137,12 @@ export async function DELETE(request: NextRequest) {
   try {
     const { thoughtId, deviceId } = await request.json()
 
-    if (!thoughtId) {
-      return NextResponse.json(
-        { error: '缺少 thoughtId 参数' },
-        { status: 400 }
-      )
+    if (!validateUUID(thoughtId)) {
+      return createErrorResponse('缺少或无效的 thoughtId 参数', 400)
     }
 
-    if (!deviceId || typeof deviceId !== 'string') {
-      return NextResponse.json(
-        { error: '缺少设备ID' },
-        { status: 400 }
-      )
+    if (!validateDeviceId(deviceId)) {
+      return createErrorResponse('缺少设备ID', 400)
     }
 
     // 首先检查想法是否存在，以及是否是当前用户创建的
@@ -192,18 +153,12 @@ export async function DELETE(request: NextRequest) {
       .single()
 
     if (fetchError || !thought) {
-      return NextResponse.json(
-        { error: '想法不存在' },
-        { status: 404 }
-      )
+      return createErrorResponse('想法不存在', 404)
     }
 
     // 检查是否是想法的主人
     if (thought.user_id !== deviceId) {
-      return NextResponse.json(
-        { error: '无权删除此想法，只有创建者可以删除' },
-        { status: 403 }
-      )
+      return createErrorResponse('无权删除此想法，只有创建者可以删除', 403)
     }
 
     // 删除想法
@@ -211,23 +166,14 @@ export async function DELETE(request: NextRequest) {
       .from('thoughts')
       .delete()
       .eq('id', thoughtId)
-      .eq('user_id', deviceId) // 双重检查，确保只能删除自己的
+      .eq('user_id', deviceId)
 
     if (error) {
-      console.error('Delete thought error:', error)
-      return NextResponse.json(
-        { error: '删除想法失败' },
-        { status: 500 }
-      )
+      return handleDatabaseError(error, '删除想法失败')
     }
 
-    return NextResponse.json({ success: true }, { status: 200 })
+    return createSuccessResponse({})
   } catch (error) {
-    console.error('Delete thought error:', error)
-    return NextResponse.json(
-      { error: '服务器错误' },
-      { status: 500 }
-    )
+    return handleDatabaseError(error, '服务器错误')
   }
 }
-

@@ -1,26 +1,28 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { createErrorResponse, createSuccessResponse, validateUUID, handleDatabaseError, handleExternalApiError } from '@/lib/api-utils'
 
 export async function POST(request: NextRequest) {
   try {
     const { storyId, words, content } = await request.json()
 
-    if (!storyId || !words || !content) {
-      return NextResponse.json(
-        { error: '缺少必要的参数' },
-        { status: 400 }
-      )
+    if (!validateUUID(storyId)) {
+      return createErrorResponse('缺少或无效的故事ID', 400)
+    }
+
+    if (!words || typeof words !== 'string' || words.trim().length === 0) {
+      return createErrorResponse('缺少关键词', 400)
+    }
+
+    if (!content || typeof content !== 'string' || content.trim().length === 0) {
+      return createErrorResponse('缺少故事内容', 400)
     }
 
     // 豆包API配置
-    // 根据提供的API示例，使用Bearer token认证
     const doubaoApiKey = process.env.DOUBAO_API_KEY || process.env.DOUBAO_ACCESS_KEY
 
     if (!doubaoApiKey) {
-      return NextResponse.json(
-        { error: '豆包API配置未完成，请设置DOUBAO_API_KEY环境变量' },
-        { status: 500 }
-      )
+      return createErrorResponse('豆包API配置未完成，请设置DOUBAO_API_KEY环境变量', 500)
     }
 
     // 根据故事内容生成图片描述prompt
@@ -66,46 +68,36 @@ export async function POST(request: NextRequest) {
     })
 
     if (!response.ok) {
-      const errorText = await response.text()
-      console.error('豆包API错误:', response.status, errorText)
-      let errorMessage = '图片生成失败，请稍后重试'
+      let errorData: any
       try {
-        const errorData = JSON.parse(errorText)
-        errorMessage = errorData.error?.message || errorData.message || errorMessage
+        const errorText = await response.text()
+        errorData = JSON.parse(errorText)
       } catch {
-        // 使用默认错误消息
+        errorData = { error: { message: '图片生成失败，请稍后重试' } }
       }
-      return NextResponse.json(
-        { error: errorMessage },
-        { status: response.status }
+      
+      return handleExternalApiError(
+        errorData.error || errorData,
+        '豆包',
+        '图片生成失败，请稍后重试'
       )
     }
 
     const data = await response.json()
-    console.log('豆包API响应:', JSON.stringify(data, null, 2))
     
     // 解析返回的图片URL
-    // 根据 /api/v3/images/generations 端点的响应格式
-    // 响应格式通常是：{ "data": [{ "url": "..." }] }
     let imageUrl = ''
     
     if (data.data && Array.isArray(data.data) && data.data.length > 0) {
-      // 标准格式：data数组中的第一个元素的url字段
-      imageUrl = data.data[0].url || data.data[0].b64_json
+      imageUrl = data.data[0].url || data.data[0].b64_json || ''
     } else if (data.url) {
-      // 直接返回url字段
       imageUrl = data.url
     } else if (data.image_url) {
-      // 返回image_url字段
       imageUrl = data.image_url
     }
 
     if (!imageUrl) {
-      console.error('无法获取图片URL，完整响应:', JSON.stringify(data, null, 2))
-      return NextResponse.json(
-        { error: '图片生成成功但无法获取图片地址，请检查API响应格式' },
-        { status: 500 }
-      )
+      return createErrorResponse('图片生成成功但无法获取图片地址，请检查API响应格式', 500)
     }
 
     // 如果返回的是base64，需要上传到Supabase Storage
@@ -124,10 +116,7 @@ export async function POST(request: NextRequest) {
             upsert: false
           })
 
-        if (uploadError) {
-          console.error('上传图片失败:', uploadError)
-          // 如果上传失败，使用base64（临时方案）
-        } else {
+        if (!uploadError) {
           // 获取公开URL
           const { data: urlData } = supabaseAdmin.storage
             .from('story-images')
@@ -137,8 +126,8 @@ export async function POST(request: NextRequest) {
             finalImageUrl = urlData.publicUrl
           }
         }
-      } catch (uploadErr) {
-        console.error('处理图片上传错误:', uploadErr)
+      } catch {
+        // 如果上传失败，使用base64（临时方案）
       }
     }
 
@@ -149,21 +138,17 @@ export async function POST(request: NextRequest) {
       .eq('id', storyId)
 
     if (updateError) {
-      console.error('更新故事图片失败:', updateError)
       // 即使更新失败，也返回图片URL
+      if (process.env.NODE_ENV === 'development') {
+        console.error('更新故事图片失败:', updateError)
+      }
     }
 
-    return NextResponse.json({ 
-      success: true,
+    return createSuccessResponse({ 
       imageUrl: finalImageUrl 
-    }, { status: 200 })
-
+    })
   } catch (error) {
-    console.error('生成图片错误:', error)
-    return NextResponse.json(
-      { error: '服务器错误' },
-      { status: 500 }
-    )
+    return handleDatabaseError(error, '服务器错误')
   }
 }
 

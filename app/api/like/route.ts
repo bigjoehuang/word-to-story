@@ -1,29 +1,24 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { createErrorResponse, createSuccessResponse, validateUUID, handleDatabaseError } from '@/lib/api-utils'
 
 export async function POST(request: NextRequest) {
   try {
     const { storyId } = await request.json()
 
-    if (!storyId) {
-      return NextResponse.json(
-        { error: '缺少故事ID' },
-        { status: 400 }
-      )
+    if (!validateUUID(storyId)) {
+      return createErrorResponse('缺少或无效的故事ID', 400)
     }
 
     // Get existing story
-    const { data: existingStory } = await supabaseAdmin
+    const { data: existingStory, error: fetchError } = await supabaseAdmin
       .from('stories')
       .select('likes')
       .eq('id', storyId)
       .single()
 
-    if (!existingStory) {
-      return NextResponse.json(
-        { error: '故事不存在' },
-        { status: 404 }
-      )
+    if (fetchError || !existingStory) {
+      return createErrorResponse('故事不存在', 404)
     }
 
     // Update likes count
@@ -34,26 +29,18 @@ export async function POST(request: NextRequest) {
         likes: (existingStory.likes || 0) + 1
       })
       .eq('id', storyId)
-      .select()
+      .select('likes')
       .single()
 
     if (updateError) {
-      console.error('Update likes error:', updateError)
-      return NextResponse.json(
-        { error: '点赞失败' },
-        { status: 500 }
-      )
+      return handleDatabaseError(updateError, '点赞失败')
     }
 
-    return NextResponse.json({ 
+    return createSuccessResponse({ 
       likes: updatedStory.likes 
-    }, { status: 200 })
+    })
   } catch (error) {
-    console.error('Like story error:', error)
-    return NextResponse.json(
-      { error: '服务器错误' },
-      { status: 500 }
-    )
+    return handleDatabaseError(error, '服务器错误')
   }
 }
 

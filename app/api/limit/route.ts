@@ -1,57 +1,42 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { createErrorResponse, createSuccessResponse, validateDeviceId, getDailyLimit, getTodayDateRange, handleDatabaseError } from '@/lib/api-utils'
+import type { DailyLimitResponse } from '@/types/api'
 
 export async function GET(request: NextRequest) {
   try {
-    // Get device user ID from query parameter
     const searchParams = request.nextUrl.searchParams
     const deviceId = searchParams.get('deviceId')
 
-    if (!deviceId) {
-      return NextResponse.json(
-        { error: '缺少设备ID' },
-        { status: 400 }
-      )
+    if (!validateDeviceId(deviceId)) {
+      return createErrorResponse('缺少设备ID', 400)
     }
 
-    // Calculate today's date range
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
+    const { start, end } = getTodayDateRange()
 
     // Count stories created today by this user
     const { count, error: countError } = await supabaseAdmin
       .from('stories')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', deviceId)
-      .gte('created_at', today.toISOString())
-      .lt('created_at', tomorrow.toISOString())
+      .gte('created_at', start)
+      .lt('created_at', end)
 
     if (countError) {
-      console.error('Count stories error:', countError)
-      return NextResponse.json(
-        { error: '获取剩余次数失败' },
-        { status: 500 }
-      )
+      return handleDatabaseError(countError, '获取剩余次数失败')
     }
 
-    // 从环境变量获取每日限制，默认为 5
-    const dailyLimit = parseInt(process.env.DAILY_STORY_LIMIT || '5', 10)
+    const dailyLimit = getDailyLimit()
     const used = count || 0
     const remaining = Math.max(0, dailyLimit - used)
 
-    return NextResponse.json({
+    return createSuccessResponse<DailyLimitResponse>({
       limit: dailyLimit,
       used,
       remaining
-    }, { status: 200 })
+    })
   } catch (error) {
-    console.error('Get limit error:', error)
-    return NextResponse.json(
-      { error: '服务器错误' },
-      { status: 500 }
-    )
+    return handleDatabaseError(error, '服务器错误')
   }
 }
 

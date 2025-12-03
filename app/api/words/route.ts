@@ -1,19 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { createErrorResponse, createSuccessResponse, handleDatabaseError } from '@/lib/api-utils'
+import type { WordCount } from '@/types/api'
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
-    // 获取所有故事并按字分组统计
     const { data: stories, error } = await supabase
       .from('stories')
       .select('words')
 
     if (error) {
-      console.error('Fetch words error:', error)
-      return NextResponse.json(
-        { error: '获取字列表失败' },
-        { status: 500 }
-      )
+      return handleDatabaseError(error, '获取字列表失败')
     }
 
     // 按字分组统计
@@ -26,20 +23,16 @@ export async function GET(request: NextRequest) {
     })
 
     // 转换为数组并按故事数量排序
-    const wordsList = Array.from(wordCounts.entries())
+    const wordsList: WordCount[] = Array.from(wordCounts.entries())
       .map(([word, count]) => ({ word, count }))
-      .sort((a, b) => b.count - a.count) // 按数量降序
+      .sort((a, b) => b.count - a.count)
 
-    return NextResponse.json({
+    return createSuccessResponse({
       words: wordsList,
       total: wordsList.length
-    }, { status: 200 })
+    })
   } catch (error) {
-    console.error('Get words error:', error)
-    return NextResponse.json(
-      { error: '服务器错误' },
-      { status: 500 }
-    )
+    return handleDatabaseError(error, '服务器错误')
   }
 }
 

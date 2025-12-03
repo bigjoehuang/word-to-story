@@ -5,12 +5,9 @@ export interface Story {
   likes: number
   created_at: string
   image_url?: string | null
+  user_id?: string
 }
 
-export interface Pagination {
-  page: number
-  limit: number
-  total: number
-  totalPages: number
-}
+// 使用统一的 Pagination 类型（从 types/api.ts）
+export type { Pagination } from './api'
 

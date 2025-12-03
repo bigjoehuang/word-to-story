@@ -1,13 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { createErrorResponse, createSuccessResponse, handleDatabaseError } from '@/lib/api-utils'
+import type { Pagination } from '@/types/api'
+import type { Story } from '@/types/story'
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const search = searchParams.get('search') || ''
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '20')
-    const sortBy = searchParams.get('sortBy') || 'created_at' // created_at or likes
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
+    const limit = Math.max(1, Math.min(100, parseInt(searchParams.get('limit') || '20', 10)))
+    const sortBy = searchParams.get('sortBy') || 'created_at'
     const offset = (page - 1) * limit
 
     let query = supabase
@@ -15,8 +18,8 @@ export async function GET(request: NextRequest) {
       .select('id, words, content, likes, created_at, image_url', { count: 'exact' })
 
     // Add search filter
-    if (search) {
-      query = query.or(`words.ilike.%${search}%,content.ilike.%${search}%`)
+    if (search.trim()) {
+      query = query.or(`words.ilike.%${search.trim()}%,content.ilike.%${search.trim()}%`)
     }
 
     // Add sorting
@@ -32,28 +35,22 @@ export async function GET(request: NextRequest) {
     const { data: stories, error, count } = await query
 
     if (error) {
-      console.error('Fetch stories error:', error)
-      return NextResponse.json(
-        { error: '获取故事列表失败' },
-        { status: 500 }
-      )
+      return handleDatabaseError(error, '获取故事列表失败')
     }
 
-    return NextResponse.json({
-      stories: stories || [],
+    const total = count || 0
+
+    return createSuccessResponse({
+      stories: (stories as Story[]) || [],
       pagination: {
         page,
         limit,
-        total: count || 0,
-        totalPages: Math.ceil((count || 0) / limit)
-      }
-    }, { status: 200 })
+        total,
+        totalPages: Math.ceil(total / limit)
+      } as Pagination
+    })
   } catch (error) {
-    console.error('Get stories error:', error)
-    return NextResponse.json(
-      { error: '服务器错误' },
-      { status: 500 }
-    )
+    return handleDatabaseError(error, '服务器错误')
   }
 }
 
