@@ -5,6 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { MessageSquare, Send, X, Edit2, Trash2 } from 'lucide-react'
 import { getDeviceId } from '@/lib/deviceId'
 
+// 简单的内存缓存：按 highlightId 缓存想法列表
+// 刷新页面后会丢失，但可以显著减少同一会话内的重复请求卡顿
+const thoughtCache = new Map<string, Thought[]>()
+
 interface Thought {
   id: string
   highlight_id: string
@@ -36,14 +40,32 @@ export default function ThoughtInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const currentDeviceId = getDeviceId() // 缓存设备ID，避免重复调用
 
-  // Load existing thoughts
+  // Load existing thoughts（先用缓存同步显示，再异步刷新）
   useEffect(() => {
+    // 1. 先从缓存里读，立刻显示，避免每次点击都白屏/卡顿
+    const cached = thoughtCache.get(highlightId)
+    if (cached && cached.length > 0) {
+      setExistingThoughts(cached)
+    }
+
+    // 2. 再异步请求最新数据，如果有变化再更新
     const loadThoughts = async () => {
       try {
         const response = await fetch(`/api/thoughts?highlightId=${highlightId}`)
         const data = await response.json()
         if (response.ok && data.thoughts) {
-          setExistingThoughts(data.thoughts)
+          const newThoughts: Thought[] = data.thoughts
+
+          // 对比缓存，只有在有新增/变化时才更新 state，避免不必要的重渲染
+          const prev = thoughtCache.get(highlightId) || []
+          const isSame =
+            prev.length === newThoughts.length &&
+            prev.every((p, idx) => p.id === newThoughts[idx].id && p.content === newThoughts[idx].content)
+
+          if (!isSame) {
+            thoughtCache.set(highlightId, newThoughts)
+            setExistingThoughts(newThoughts)
+          }
         }
       } catch (error) {
         console.error('Failed to load thoughts:', error)
@@ -82,7 +104,11 @@ export default function ThoughtInput({
       const data = await response.json()
 
       if (response.ok && data.thought) {
-        setExistingThoughts(prev => [data.thought, ...prev])
+        setExistingThoughts(prev => {
+          const updated = [data.thought, ...prev]
+          thoughtCache.set(highlightId, updated)
+          return updated
+        })
         setThought('')
         onThoughtSaved()
       }
@@ -118,9 +144,11 @@ export default function ThoughtInput({
       const data = await response.json()
 
       if (response.ok && data.thought) {
-        setExistingThoughts(prev => prev.map(t => 
-          t.id === thoughtId ? data.thought : t
-        ))
+        setExistingThoughts(prev => {
+          const updated = prev.map(t => (t.id === thoughtId ? data.thought : t))
+          thoughtCache.set(highlightId, updated)
+          return updated
+        })
         setEditingId(null)
         setEditContent('')
       } else {
@@ -146,7 +174,11 @@ export default function ThoughtInput({
       })
 
       if (response.ok) {
-        setExistingThoughts(prev => prev.filter(t => t.id !== thoughtId))
+        setExistingThoughts(prev => {
+          const updated = prev.filter(t => t.id !== thoughtId)
+          thoughtCache.set(highlightId, updated)
+          return updated
+        })
       } else {
         const data = await response.json()
         alert(data.error || '删除失败')

@@ -34,3 +34,4 @@ CREATE POLICY "Allow public delete highlights" ON highlights
   FOR DELETE
   USING (true);
 
+
