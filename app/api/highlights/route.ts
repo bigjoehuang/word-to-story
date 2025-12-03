@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await supabaseAdmin
       .from('highlights')
-      .select('id, text_content, start_index, end_index, created_at')
+      .select('id, text_content, start_index, end_index, created_at, user_id')
       .eq('story_id', storyId)
       .order('start_index', { ascending: true })
 
@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
 // Delete highlight
 export async function DELETE(request: NextRequest) {
   try {
-    const { highlightId } = await request.json()
+    const { highlightId, deviceId } = await request.json()
 
     if (!highlightId) {
       return NextResponse.json(
@@ -110,10 +110,41 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
+    if (!deviceId || typeof deviceId !== 'string') {
+      return NextResponse.json(
+        { error: '缺少设备ID' },
+        { status: 400 }
+      )
+    }
+
+    // 首先检查划线是否存在，以及是否是当前用户创建的
+    const { data: highlight, error: fetchError } = await supabaseAdmin
+      .from('highlights')
+      .select('user_id')
+      .eq('id', highlightId)
+      .single()
+
+    if (fetchError || !highlight) {
+      return NextResponse.json(
+        { error: '划线不存在' },
+        { status: 404 }
+      )
+    }
+
+    // 检查是否是划线的主人
+    if (highlight.user_id !== deviceId) {
+      return NextResponse.json(
+        { error: '无权删除此划线，只有创建者可以删除' },
+        { status: 403 }
+      )
+    }
+
+    // 删除划线
     const { error } = await supabaseAdmin
       .from('highlights')
       .delete()
       .eq('id', highlightId)
+      .eq('user_id', deviceId) // 双重检查，确保只能删除自己的
 
     if (error) {
       console.error('Delete highlight error:', error)

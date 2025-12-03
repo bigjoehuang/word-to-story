@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabaseAdmin
       .from('thoughts')
-      .select('id, highlight_id, story_id, content, created_at')
+      .select('id, highlight_id, story_id, content, created_at, user_id')
       .order('created_at', { ascending: false })
 
     if (highlightId) {
@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
 // Update thought
 export async function PUT(request: NextRequest) {
   try {
-    const { thoughtId, content } = await request.json()
+    const { thoughtId, content, deviceId } = await request.json()
 
     if (!thoughtId || !content || typeof content !== 'string' || content.trim().length === 0) {
       return NextResponse.json(
@@ -110,10 +110,40 @@ export async function PUT(request: NextRequest) {
       )
     }
 
+    if (!deviceId || typeof deviceId !== 'string') {
+      return NextResponse.json(
+        { error: '缺少设备ID' },
+        { status: 400 }
+      )
+    }
+
+    // 首先检查想法是否存在，以及是否是当前用户创建的
+    const { data: existingThought, error: fetchError } = await supabaseAdmin
+      .from('thoughts')
+      .select('user_id')
+      .eq('id', thoughtId)
+      .single()
+
+    if (fetchError || !existingThought) {
+      return NextResponse.json(
+        { error: '想法不存在' },
+        { status: 404 }
+      )
+    }
+
+    // 检查是否是想法的主人
+    if (existingThought.user_id !== deviceId) {
+      return NextResponse.json(
+        { error: '无权编辑此想法，只有创建者可以编辑' },
+        { status: 403 }
+      )
+    }
+
     const { data, error } = await supabaseAdmin
       .from('thoughts')
       .update({ content: content.trim() })
       .eq('id', thoughtId)
+      .eq('user_id', deviceId) // 双重检查
       .select()
       .single()
 
@@ -138,7 +168,7 @@ export async function PUT(request: NextRequest) {
 // Delete thought
 export async function DELETE(request: NextRequest) {
   try {
-    const { thoughtId } = await request.json()
+    const { thoughtId, deviceId } = await request.json()
 
     if (!thoughtId) {
       return NextResponse.json(
@@ -147,10 +177,41 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
+    if (!deviceId || typeof deviceId !== 'string') {
+      return NextResponse.json(
+        { error: '缺少设备ID' },
+        { status: 400 }
+      )
+    }
+
+    // 首先检查想法是否存在，以及是否是当前用户创建的
+    const { data: thought, error: fetchError } = await supabaseAdmin
+      .from('thoughts')
+      .select('user_id')
+      .eq('id', thoughtId)
+      .single()
+
+    if (fetchError || !thought) {
+      return NextResponse.json(
+        { error: '想法不存在' },
+        { status: 404 }
+      )
+    }
+
+    // 检查是否是想法的主人
+    if (thought.user_id !== deviceId) {
+      return NextResponse.json(
+        { error: '无权删除此想法，只有创建者可以删除' },
+        { status: 403 }
+      )
+    }
+
+    // 删除想法
     const { error } = await supabaseAdmin
       .from('thoughts')
       .delete()
       .eq('id', thoughtId)
+      .eq('user_id', deviceId) // 双重检查，确保只能删除自己的
 
     if (error) {
       console.error('Delete thought error:', error)
