@@ -85,6 +85,23 @@ export default function ThoughtInput({
     const content = thought.trim()
     if (!content) return
 
+    // 乐观更新：先在本地插入一条“临时想法”，立刻反馈给用户
+    const tempId = `temp-${Date.now()}`
+    const optimisticThought: Thought = {
+      id: tempId,
+      highlight_id: highlightId,
+      content,
+      created_at: new Date().toISOString(),
+      user_id: currentDeviceId,
+    }
+
+    setExistingThoughts((prev) => {
+      const updated = [optimisticThought, ...prev]
+      thoughtCache.set(highlightId, updated)
+      return updated
+    })
+    setThought('') // 立即清空输入框，感觉更“秒发”
+
     setLoading(true)
     try {
       const deviceId = getDeviceId()
@@ -104,16 +121,35 @@ export default function ThoughtInput({
       const data = await response.json()
 
       if (response.ok && data.thought) {
+        // 用服务端返回的真实数据替换临时想法
         setExistingThoughts(prev => {
-          const updated = [data.thought, ...prev]
-          thoughtCache.set(highlightId, updated)
-          return updated
+          const replaced = prev.map(t => (t.id === tempId ? data.thought : t))
+          thoughtCache.set(highlightId, replaced)
+          return replaced
         })
-        setThought('')
         onThoughtSaved()
+      } else {
+        // 失败时撤回临时想法，并把内容放回输入框，提示用户
+        setExistingThoughts(prev => {
+          const reverted = prev.filter(t => t.id !== tempId)
+          thoughtCache.set(highlightId, reverted)
+          return reverted
+        })
+        setThought(content)
+        if (data?.error) {
+          alert(data.error)
+        }
       }
     } catch (error) {
       console.error('Failed to save thought:', error)
+      // 网络错误同样撤回临时想法
+      setExistingThoughts(prev => {
+        const reverted = prev.filter(t => t.id !== tempId)
+        thoughtCache.set(highlightId, reverted)
+        return reverted
+      })
+      setThought(content)
+      alert('保存失败，请稍后重试')
     } finally {
       setLoading(false)
     }
