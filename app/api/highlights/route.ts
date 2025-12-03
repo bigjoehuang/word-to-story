@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 // Save highlight
 export async function POST(request: NextRequest) {
   try {
-    const { storyId, textContent, startIndex, endIndex } = await request.json()
+    const { storyId, textContent, startIndex, endIndex, deviceId } = await request.json()
 
     if (!storyId || !textContent || typeof startIndex !== 'number' || typeof endIndex !== 'number') {
       return NextResponse.json(
@@ -20,10 +20,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get client IP address
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-               request.headers.get('x-real-ip') ||
-               'unknown'
+    // Get device user ID from request body
+    const { deviceId } = await request.json()
+    
+    if (!deviceId || typeof deviceId !== 'string') {
+      return NextResponse.json(
+        { error: '缺少设备ID' },
+        { status: 400 }
+      )
+    }
 
     const { data, error } = await supabaseAdmin
       .from('highlights')
@@ -32,7 +37,8 @@ export async function POST(request: NextRequest) {
         text_content: textContent,
         start_index: startIndex,
         end_index: endIndex,
-        ip_address: ip
+        user_id: deviceId,
+        ip_address: null // 保留字段但不再使用
       })
       .select()
       .single()

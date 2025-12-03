@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 // Save generation time
 export async function POST(request: NextRequest) {
   try {
-    const { duration } = await request.json()
+    const { duration, deviceId } = await request.json()
 
     if (!duration || typeof duration !== 'number' || duration < 0) {
       return NextResponse.json(
@@ -13,16 +13,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get client IP address
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-               request.headers.get('x-real-ip') ||
-               'unknown'
+    if (!deviceId || typeof deviceId !== 'string') {
+      return NextResponse.json(
+        { error: '缺少设备ID' },
+        { status: 400 }
+      )
+    }
 
     const { data, error } = await supabaseAdmin
       .from('generation_times')
       .insert({
         duration_ms: Math.round(duration),
-        ip_address: ip
+        user_id: deviceId,
+        ip_address: null // 保留字段但不再使用
       })
       .select()
       .single()

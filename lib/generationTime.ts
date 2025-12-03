@@ -9,17 +9,20 @@ export interface GenerationTimeRecord {
 const DEFAULT_ESTIMATED_TIME = 30000 // 默认30秒
 const DEFAULT_MAX_TIME = 60000 // 默认60秒
 
+import { getDeviceId } from './deviceId'
+
 /**
  * 保存创作耗时记录到数据库
  */
 export async function saveGenerationTime(duration: number): Promise<void> {
   try {
+    const deviceId = getDeviceId()
     const response = await fetch('/api/generation-time', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ duration }),
+      body: JSON.stringify({ duration, deviceId }),
     })
 
     if (!response.ok) {

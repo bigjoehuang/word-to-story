@@ -3,7 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 export async function POST(request: NextRequest) {
   try {
-    const { words } = await request.json()
+    const { words, deviceId } = await request.json()
 
     // Validate input
     if (!words || typeof words !== 'string') {
@@ -21,12 +21,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get client IP address
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-               request.headers.get('x-real-ip') ||
-               'unknown'
+    // Validate device ID
+    if (!deviceId || typeof deviceId !== 'string') {
+      return NextResponse.json(
+        { error: '缺少设备ID' },
+        { status: 400 }
+      )
+    }
 
-    // Check daily limit (5 stories per IP per day)
+    // Check daily limit (从环境变量 DAILY_STORY_LIMIT 读取，默认 5)
     // 这个检查必须在调用 DeepSeek API 之前进行，确保 API 有拦截
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -36,11 +39,12 @@ export async function POST(request: NextRequest) {
     const { count, error: countError } = await supabaseAdmin
       .from('stories')
       .select('*', { count: 'exact', head: true })
-      .eq('ip_address', ip)
+      .eq('user_id', deviceId)
       .gte('created_at', today.toISOString())
       .lt('created_at', tomorrow.toISOString())
 
-    const dailyLimit = 5
+    // 从环境变量获取每日限制，默认为 5
+    const dailyLimit = parseInt(process.env.DAILY_STORY_LIMIT || '5', 10)
     
     // 如果查询失败，为了安全起见，拒绝请求
     if (countError) {
@@ -61,7 +65,7 @@ export async function POST(request: NextRequest) {
     // 严格检查：如果已达到或超过限制，立即拦截
     // 这个拦截确保即使前端验证被绕过，API 也会拒绝请求
     if (usedCount >= dailyLimit) {
-      console.log(`[API拦截] Daily limit reached for IP ${ip}: ${usedCount}/${dailyLimit}`)
+      console.log(`[API拦截] Daily limit reached for user ${deviceId}: ${usedCount}/${dailyLimit}`)
       return NextResponse.json(
         { 
           error: '今日创作次数已用完，请明天再试',
@@ -73,7 +77,7 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    console.log(`[API验证通过] IP ${ip} 剩余次数: ${dailyLimit - usedCount}/${dailyLimit}`)
+    console.log(`[API验证通过] User ${deviceId} 剩余次数: ${dailyLimit - usedCount}/${dailyLimit}`)
 
     // Call DeepSeek API
     const deepseekApiKey = process.env.DEEPSEEK_API_KEY
@@ -163,7 +167,8 @@ export async function POST(request: NextRequest) {
       .insert({
         words: trimmedWords,
         content: storyContent,
-        ip_address: ip
+        user_id: deviceId,
+        ip_address: null // 保留字段但不再使用
       })
       .select()
       .single()

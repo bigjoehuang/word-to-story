@@ -11,12 +11,13 @@ import ReadingSettings from '@/components/ReadingSettings'
 import { Story } from '@/types/story'
 import { formatDate, isLiked } from '@/lib/utils'
 import { saveGenerationTime } from '@/lib/generationTime'
+import { getDeviceId } from '@/lib/deviceId'
 
 export default function Home() {
   const [words, setWords] = useState('')
   const [loading, setLoading] = useState(false)
   const [generationStartTime, setGenerationStartTime] = useState(0)
-  const [myStories, setMyStories] = useState<Story[]>([])
+  const [latestStory, setLatestStory] = useState<Story | null>(null)
   const [error, setError] = useState('')
   const [dailyLimit, setDailyLimit] = useState({ limit: 5, used: 0, remaining: 5 })
 
@@ -24,7 +25,8 @@ export default function Home() {
   useEffect(() => {
     const fetchDailyLimit = async () => {
       try {
-        const response = await fetch('/api/limit')
+        const deviceId = getDeviceId()
+        const response = await fetch(`/api/limit?deviceId=${encodeURIComponent(deviceId)}`)
         const data = await response.json()
         if (response.ok) {
           setDailyLimit(data)
@@ -36,26 +38,18 @@ export default function Home() {
     fetchDailyLimit()
   }, [])
 
-  // Load my stories from localStorage
-  useEffect(() => {
-    const savedStories = localStorage.getItem('myStories')
-    if (savedStories) {
-      try {
-        setMyStories(JSON.parse(savedStories))
-      } catch {
-        // Invalid JSON
-      }
-    }
-  }, [])
-
   const handleImageGenerated = (storyId: string, imageUrl: string) => {
-    // Update the story in myStories with the new image URL
-    const updatedStories = myStories.map(story => 
+    // Update the latest story with the new image URL
+    if (latestStory && latestStory.id === storyId) {
+      setLatestStory({ ...latestStory, image_url: imageUrl })
+    }
+    // Also update in localStorage
+    const savedStories = JSON.parse(localStorage.getItem('myStories') || '[]')
+    const updatedStories = savedStories.map((story: Story) => 
       story.id === storyId 
         ? { ...story, image_url: imageUrl }
         : story
     )
-    setMyStories(updatedStories)
     localStorage.setItem('myStories', JSON.stringify(updatedStories))
   }
 
@@ -80,12 +74,13 @@ export default function Home() {
     setGenerationStartTime(startTime)
 
     try {
+      const deviceId = getDeviceId()
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ words: trimmedWords }),
+        body: JSON.stringify({ words: trimmedWords, deviceId }),
       })
 
       const data = await response.json()
@@ -96,14 +91,18 @@ export default function Home() {
         // Save generation time to database
         await saveGenerationTime(duration)
         
-        // Add new story to the top of my stories
-        const newStories = [data.story, ...myStories]
-        setMyStories(newStories)
+        // Save to localStorage (for my-stories page)
+        const savedStories = JSON.parse(localStorage.getItem('myStories') || '[]')
+        const newStories = [data.story, ...savedStories]
         localStorage.setItem('myStories', JSON.stringify(newStories))
+        
+        // Set as latest story (only show this one on home page)
+        setLatestStory(data.story)
         setWords('')
         
         // Refresh daily limit
-        const limitResponse = await fetch('/api/limit')
+        const deviceId = getDeviceId()
+        const limitResponse = await fetch(`/api/limit?deviceId=${encodeURIComponent(deviceId)}`)
         const limitData = await limitResponse.json()
         if (limitResponse.ok) {
           setDailyLimit(limitData)
@@ -114,7 +113,8 @@ export default function Home() {
           const errorMessage = data.error || '今日创作次数已达上限，请明天再试'
           setError(errorMessage)
           // 立即刷新限制信息
-          const limitResponse = await fetch('/api/limit')
+          const deviceId = getDeviceId()
+          const limitResponse = await fetch(`/api/limit?deviceId=${encodeURIComponent(deviceId)}`)
           const limitData = await limitResponse.json()
           if (limitResponse.ok) {
             setDailyLimit(limitData)
@@ -139,11 +139,9 @@ export default function Home() {
     }
 
     // Optimistic update
-    setMyStories(prev => prev.map(story => 
-      story.id === storyId 
-        ? { ...story, likes: currentLikes + 1 }
-        : story
-    ))
+    if (latestStory && latestStory.id === storyId) {
+      setLatestStory({ ...latestStory, likes: currentLikes + 1 })
+    }
 
     try {
       const response = await fetch('/api/like', {
@@ -158,26 +156,20 @@ export default function Home() {
 
       if (response.ok) {
         localStorage.setItem('likedStories', JSON.stringify([...likedStories, storyId]))
-        setMyStories(prev => prev.map(story => 
-          story.id === storyId 
-            ? { ...story, likes: data.likes }
-            : story
-        ))
+        if (latestStory && latestStory.id === storyId) {
+          setLatestStory({ ...latestStory, likes: data.likes })
+        }
       } else {
         // Revert on error
-        setMyStories(prev => prev.map(story => 
-          story.id === storyId 
-            ? { ...story, likes: currentLikes }
-            : story
-        ))
+        if (latestStory && latestStory.id === storyId) {
+          setLatestStory({ ...latestStory, likes: currentLikes })
+        }
       }
     } catch {
       // Revert on error
-      setMyStories(prev => prev.map(story => 
-        story.id === storyId 
-          ? { ...story, likes: currentLikes }
-          : story
-      ))
+      if (latestStory && latestStory.id === storyId) {
+        setLatestStory({ ...latestStory, likes: currentLikes })
+      }
     }
   }
 
@@ -217,7 +209,7 @@ export default function Home() {
               <div>
                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300">今日剩余创作次数</p>
                 <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">
-                  {dailyLimit.remaining} / {dailyLimit.limit}
+                  {dailyLimit.remaining} 
                 </p>
               </div>
               <div className="text-right">
@@ -306,8 +298,8 @@ export default function Home() {
           </form>
         </motion.div>
 
-        {/* My Stories */}
-        {myStories.length > 0 && (
+        {/* Latest Story */}
+        {latestStory && (
           <motion.div 
             className="space-y-6"
             initial={{ opacity: 0, y: 20 }}
@@ -316,33 +308,19 @@ export default function Home() {
           >
             <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
               <Sparkles className="w-6 h-6 text-purple-500" />
-              我的创作
+              最新创作
             </h2>
             <AnimatePresence>
-              {myStories.map((story, index) => (
-                <StoryCard
-                  key={story.id}
-                  story={story}
-                  onLike={handleLike}
-                  isLiked={isLiked}
-                  formatDate={formatDate}
-                  index={index}
-                  onImageGenerated={handleImageGenerated}
-                />
-              ))}
+              <StoryCard
+                key={latestStory.id}
+                story={latestStory}
+                onLike={handleLike}
+                isLiked={isLiked}
+                formatDate={formatDate}
+                index={0}
+                onImageGenerated={handleImageGenerated}
+              />
             </AnimatePresence>
-          </motion.div>
-        )}
-
-        {myStories.length === 0 && !loading && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-12 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700"
-          >
-            <p className="text-gray-500 dark:text-gray-400 text-lg">
-              还没有创作故事，快来创作第一个吧！
-            </p>
           </motion.div>
         )}
       </div>

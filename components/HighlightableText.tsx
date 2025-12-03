@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, ReactElement } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Underline, X, MessageSquare } from 'lucide-react'
 import ThoughtInput from './ThoughtInput'
+import { getDeviceId } from '@/lib/deviceId'
 
 interface Highlight {
   id: string
@@ -137,6 +138,7 @@ export default function HighlightableText({ text, storyId, className = '' }: Hig
     if (!selectedRange) return
 
     try {
+      const deviceId = getDeviceId()
       const response = await fetch('/api/highlights', {
         method: 'POST',
         headers: {
@@ -146,7 +148,8 @@ export default function HighlightableText({ text, storyId, className = '' }: Hig
           storyId,
           textContent: selectedRange.text,
           startIndex: selectedRange.start,
-          endIndex: selectedRange.end
+          endIndex: selectedRange.end,
+          deviceId
         }),
       })
 

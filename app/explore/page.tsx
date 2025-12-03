@@ -1,126 +1,53 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import InfiniteScroll from 'react-infinite-scroll-component'
+import { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'
+import { useRouter } from 'next/navigation'
 import { 
   Sparkles, 
   Loader2,
-  Compass
+  Compass,
+  BookOpen
 } from 'lucide-react'
 import ThemeToggle from '@/components/ThemeToggle'
 import Navigation from '@/components/Navigation'
-import StorySkeleton from '@/components/StorySkeleton'
-import StoryCard from '@/components/StoryCard'
 import ReadingSettings from '@/components/ReadingSettings'
-import { Story, Pagination } from '@/types/story'
-import { formatDate, isLiked } from '@/lib/utils'
+
+interface WordCount {
+  word: string
+  count: number
+}
 
 export default function ExplorePage() {
-  const [stories, setStories] = useState<Story[]>([])
-  const [loadingStories, setLoadingStories] = useState(true)
+  const [words, setWords] = useState<WordCount[]>([])
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [page, setPage] = useState(1)
-  const [hasMore, setHasMore] = useState(true)
-  const [pagination, setPagination] = useState<Pagination | null>(null)
+  const router = useRouter()
 
-  // Fetch stories with pagination
-  const fetchStories = useCallback(async (reset = false) => {
-    try {
-      const currentPage = reset ? 1 : page
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: '20',
-        sortBy: 'created_at'
-      })
-
-      const response = await fetch(`/api/stories?${params}`)
-      const data = await response.json()
-      
-      if (response.ok) {
-        if (reset) {
-          setStories(data.stories)
-          setPage(2)
-        } else {
-          setStories(prev => [...prev, ...data.stories])
-          setPage(prev => prev + 1)
-        }
-        setPagination(data.pagination)
-        setHasMore(data.pagination.page < data.pagination.totalPages)
-      } else {
-        setError(data.error || '获取故事失败')
-      }
-    } catch {
-      setError('网络错误')
-    } finally {
-      setLoadingStories(false)
-    }
-  }, [page])
-
-  // Fetch stories on mount
+  // Fetch words with counts
   useEffect(() => {
-    setLoadingStories(true)
-    setPage(1)
-    fetchStories(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const fetchWords = async () => {
+      try {
+        setLoading(true)
+        const response = await fetch('/api/words')
+        const data = await response.json()
+        
+        if (response.ok) {
+          setWords(data.words || [])
+        } else {
+          setError(data.error || '获取字列表失败')
+        }
+      } catch {
+        setError('网络错误')
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchWords()
   }, [])
 
-  const handleImageGenerated = (storyId: string, imageUrl: string) => {
-    // Update the story in stories list with the new image URL
-    setStories(prev => prev.map(story => 
-      story.id === storyId 
-        ? { ...story, image_url: imageUrl }
-        : story
-    ))
-  }
-
-  const handleLike = async (storyId: string, currentLikes: number) => {
-    const likedStories = JSON.parse(localStorage.getItem('likedStories') || '[]')
-    if (likedStories.includes(storyId)) {
-      return
-    }
-
-    // Optimistic update
-    setStories(prev => prev.map(story => 
-      story.id === storyId 
-        ? { ...story, likes: currentLikes + 1 }
-        : story
-    ))
-
-    try {
-      const response = await fetch('/api/like', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ storyId }),
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        localStorage.setItem('likedStories', JSON.stringify([...likedStories, storyId]))
-        setStories(prev => prev.map(story => 
-          story.id === storyId 
-            ? { ...story, likes: data.likes }
-            : story
-        ))
-      } else {
-        // Revert on error
-        setStories(prev => prev.map(story => 
-          story.id === storyId 
-            ? { ...story, likes: currentLikes }
-            : story
-        ))
-      }
-    } catch {
-      // Revert on error
-      setStories(prev => prev.map(story => 
-        story.id === storyId 
-          ? { ...story, likes: currentLikes }
-          : story
-      ))
-    }
+  const handleWordClick = (word: string) => {
+    router.push(`/read?word=${encodeURIComponent(word)}`)
   }
 
   return (
@@ -146,25 +73,31 @@ export default function ExplorePage() {
           <Navigation />
         </motion.header>
 
-        {/* Stories List */}
-        <div className="space-y-6">
+        {/* Words List */}
+        <div className="space-y-4">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-            <Sparkles className="w-6 h-6 text-purple-500" />
-            故事列表
-            {pagination && (
+            <BookOpen className="w-6 h-6 text-purple-500" />
+            按字浏览
+            {words.length > 0 && (
               <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
-                ({pagination.total} 个故事)
+                ({words.length} 个字)
               </span>
             )}
           </h2>
           
-          {loadingStories && stories.length === 0 ? (
-            <div className="space-y-6">
-              {[...Array(3)].map((_, i) => (
-                <StorySkeleton key={i} />
-              ))}
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
             </div>
-          ) : stories.length === 0 ? (
+          ) : error ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-center py-12 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700"
+            >
+              <p className="text-red-500 dark:text-red-400 text-lg">{error}</p>
+            </motion.div>
+          ) : words.length === 0 ? (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -175,35 +108,29 @@ export default function ExplorePage() {
               </p>
             </motion.div>
           ) : (
-            <InfiniteScroll
-              dataLength={stories.length}
-              next={() => fetchStories()}
-              hasMore={hasMore}
-              loader={
-                <div className="flex justify-center py-8">
-                  <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-                </div>
-              }
-              endMessage={
-                <p className="text-center text-gray-500 dark:text-gray-400 py-8">
-                  没有更多故事了
-                </p>
-              }
-            >
-              <AnimatePresence>
-                {stories.map((story, index) => (
-                  <StoryCard
-                    key={story.id}
-                    story={story}
-                    onLike={handleLike}
-                    isLiked={isLiked}
-                    formatDate={formatDate}
-                    index={index}
-                    onImageGenerated={handleImageGenerated}
-                  />
-                ))}
-              </AnimatePresence>
-            </InfiniteScroll>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {words.map((item, index) => (
+                <motion.button
+                  key={item.word}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.2, delay: index * 0.02 }}
+                  onClick={() => handleWordClick(item.word)}
+                  className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 p-6 border border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 group"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-gray-800 dark:text-white mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                      {item.word}
+                    </div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      {item.count} 个故事
+                    </div>
+                  </div>
+                </motion.button>
+              ))}
+            </div>
           )}
         </div>
       </div>

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MessageSquare, Send, X, Edit2, Trash2 } from 'lucide-react'
+import { getDeviceId } from '@/lib/deviceId'
 
 interface Thought {
   id: string
@@ -62,6 +63,7 @@ export default function ThoughtInput({
 
     setLoading(true)
     try {
+      const deviceId = getDeviceId()
       const response = await fetch('/api/thoughts', {
         method: 'POST',
         headers: {
@@ -70,7 +72,8 @@ export default function ThoughtInput({
         body: JSON.stringify({
           highlightId,
           storyId,
-          content
+          content,
+          deviceId
         }),
       })
 
