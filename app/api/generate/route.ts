@@ -9,11 +9,36 @@ import {
   handleDatabaseError,
   handleExternalApiError
 } from '@/lib/api-utils'
+import { 
+  getClientIdentifier, 
+  checkRateLimitDB, 
+  createRateLimitResponse,
+  RATE_LIMIT_CONFIGS,
+  checkRequestSize,
+  getRequestSizeLimit
+} from '@/lib/rate-limit'
 import type { Story } from '@/types/story'
 
 export async function POST(request: NextRequest) {
   try {
+    // 检查请求体大小
+    const maxSize = getRequestSizeLimit('/api/generate')
+    if (!checkRequestSize(request, maxSize)) {
+      return createErrorResponse('请求体过大', 413)
+    }
+
     const { words, deviceId } = await request.json()
+
+    // 速率限制检查（在验证之前，防止滥用）
+    const identifier = getClientIdentifier(request, deviceId)
+    const rateLimitResult = await checkRateLimitDB(
+      identifier,
+      RATE_LIMIT_CONFIGS.GENERATE_STORY
+    )
+
+    if (!rateLimitResult.allowed) {
+      return createRateLimitResponse(rateLimitResult, RATE_LIMIT_CONFIGS.GENERATE_STORY.message)
+    }
 
     // Validate input
     if (!words || typeof words !== 'string') {

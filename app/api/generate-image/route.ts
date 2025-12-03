@@ -1,10 +1,35 @@
 import { NextRequest } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { createErrorResponse, createSuccessResponse, validateUUID, handleDatabaseError, handleExternalApiError } from '@/lib/api-utils'
+import { 
+  getClientIdentifier, 
+  checkRateLimitDB, 
+  createRateLimitResponse,
+  RATE_LIMIT_CONFIGS,
+  checkRequestSize,
+  getRequestSizeLimit
+} from '@/lib/rate-limit'
 
 export async function POST(request: NextRequest) {
   try {
-    const { storyId, words, content } = await request.json()
+    // 检查请求体大小
+    const maxSize = getRequestSizeLimit('/api/generate-image')
+    if (!checkRequestSize(request, maxSize)) {
+      return createErrorResponse('请求体过大', 413)
+    }
+
+    const { storyId, words, content, deviceId } = await request.json()
+
+    // 速率限制检查
+    const identifier = getClientIdentifier(request, deviceId)
+    const rateLimitResult = await checkRateLimitDB(
+      identifier,
+      RATE_LIMIT_CONFIGS.GENERATE_IMAGE
+    )
+
+    if (!rateLimitResult.allowed) {
+      return createRateLimitResponse(rateLimitResult, RATE_LIMIT_CONFIGS.GENERATE_IMAGE.message)
+    }
 
     if (!validateUUID(storyId)) {
       return createErrorResponse('缺少或无效的故事ID', 400)

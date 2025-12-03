@@ -2,11 +2,36 @@ import { NextRequest } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { createErrorResponse, createSuccessResponse, validateDeviceId, validateUUID, handleDatabaseError } from '@/lib/api-utils'
 import { sanitizeThoughtContent, sanitizeAndValidate } from '@/lib/xss-protection'
+import { 
+  getClientIdentifier, 
+  checkRateLimitDB, 
+  createRateLimitResponse,
+  RATE_LIMIT_CONFIGS,
+  checkRequestSize,
+  getRequestSizeLimit
+} from '@/lib/rate-limit'
 
 // Save thought
 export async function POST(request: NextRequest) {
   try {
+    // 检查请求体大小
+    const maxSize = getRequestSizeLimit('/api/thoughts')
+    if (!checkRequestSize(request, maxSize)) {
+      return createErrorResponse('请求体过大', 413)
+    }
+
     const { highlightId, storyId, content, deviceId } = await request.json()
+
+    // 速率限制检查
+    const identifier = getClientIdentifier(request, deviceId)
+    const rateLimitResult = await checkRateLimitDB(
+      identifier,
+      RATE_LIMIT_CONFIGS.THOUGHT
+    )
+
+    if (!rateLimitResult.allowed) {
+      return createRateLimitResponse(rateLimitResult, RATE_LIMIT_CONFIGS.THOUGHT.message)
+    }
 
     if (!validateUUID(highlightId) || !validateUUID(storyId)) {
       return createErrorResponse('缺少必要的参数', 400)
@@ -91,7 +116,24 @@ export async function GET(request: NextRequest) {
 // Update thought
 export async function PUT(request: NextRequest) {
   try {
+    // 检查请求体大小
+    const maxSize = getRequestSizeLimit('/api/thoughts')
+    if (!checkRequestSize(request, maxSize)) {
+      return createErrorResponse('请求体过大', 413)
+    }
+
     const { thoughtId, content, deviceId } = await request.json()
+
+    // 速率限制检查
+    const identifier = getClientIdentifier(request, deviceId)
+    const rateLimitResult = await checkRateLimitDB(
+      identifier,
+      RATE_LIMIT_CONFIGS.THOUGHT
+    )
+
+    if (!rateLimitResult.allowed) {
+      return createRateLimitResponse(rateLimitResult, RATE_LIMIT_CONFIGS.THOUGHT.message)
+    }
 
     if (!validateUUID(thoughtId)) {
       return createErrorResponse('缺少或无效的 thoughtId 参数', 400)
