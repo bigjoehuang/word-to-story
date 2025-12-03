@@ -1,88 +1,20 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import InfiniteScroll from 'react-infinite-scroll-component'
-import { 
-  Heart, 
-  Search, 
-  Sparkles, 
-  Clock, 
-  TrendingUp,
-  Loader2,
-  X
-} from 'lucide-react'
+import { Sparkles, Loader2, X } from 'lucide-react'
 import ThemeToggle from '@/components/ThemeToggle'
-import StorySkeleton from '@/components/StorySkeleton'
-
-interface Story {
-  id: string
-  words: string
-  content: string
-  likes: number
-  created_at: string
-}
-
-interface Pagination {
-  page: number
-  limit: number
-  total: number
-  totalPages: number
-}
+import Navigation from '@/components/Navigation'
+import StoryCard from '@/components/StoryCard'
+import { Story } from '@/types/story'
+import { formatDate, isLiked } from '@/lib/utils'
 
 export default function Home() {
   const [words, setWords] = useState('')
   const [loading, setLoading] = useState(false)
-  const [stories, setStories] = useState<Story[]>([])
-  const [loadingStories, setLoadingStories] = useState(true)
+  const [myStories, setMyStories] = useState<Story[]>([])
   const [error, setError] = useState('')
   const [dailyLimit, setDailyLimit] = useState({ limit: 5, used: 0, remaining: 5 })
-  const [searchQuery, setSearchQuery] = useState('')
-  const [sortBy, setSortBy] = useState<'created_at' | 'likes'>('created_at')
-  const [page, setPage] = useState(1)
-  const [hasMore, setHasMore] = useState(true)
-  const [pagination, setPagination] = useState<Pagination | null>(null)
-
-  // Fetch stories with search and pagination
-  const fetchStories = useCallback(async (reset = false) => {
-    try {
-      const currentPage = reset ? 1 : page
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: '20',
-        sortBy: sortBy,
-        ...(searchQuery && { search: searchQuery })
-      })
-
-      const response = await fetch(`/api/stories?${params}`)
-      const data = await response.json()
-      
-      if (response.ok) {
-        if (reset) {
-          setStories(data.stories)
-          setPage(2)
-        } else {
-          setStories(prev => [...prev, ...data.stories])
-          setPage(prev => prev + 1)
-        }
-        setPagination(data.pagination)
-        setHasMore(data.pagination.page < data.pagination.totalPages)
-      } else {
-        setError(data.error || '获取故事失败')
-      }
-    } catch (err) {
-      setError('网络错误')
-    } finally {
-      setLoadingStories(false)
-    }
-  }, [page, sortBy, searchQuery])
-
-  // Fetch stories on mount and when filters change
-  useEffect(() => {
-    setLoadingStories(true)
-    setPage(1)
-    fetchStories(true)
-  }, [sortBy, searchQuery])
 
   // Fetch daily limit
   useEffect(() => {
@@ -93,11 +25,23 @@ export default function Home() {
         if (response.ok) {
           setDailyLimit(data)
         }
-      } catch (err) {
+      } catch {
         // Silently fail
       }
     }
     fetchDailyLimit()
+  }, [])
+
+  // Load my stories from localStorage
+  useEffect(() => {
+    const savedStories = localStorage.getItem('myStories')
+    if (savedStories) {
+      try {
+        setMyStories(JSON.parse(savedStories))
+      } catch {
+        // Invalid JSON
+      }
+    }
   }, [])
 
   const handleGenerate = async (e: React.FormEvent) => {
@@ -124,8 +68,12 @@ export default function Home() {
       const data = await response.json()
 
       if (response.ok) {
-        setStories(prev => [data.story, ...prev])
+        // Add new story to the top of my stories
+        const newStories = [data.story, ...myStories]
+        setMyStories(newStories)
+        localStorage.setItem('myStories', JSON.stringify(newStories))
         setWords('')
+        
         // Refresh daily limit
         const limitResponse = await fetch('/api/limit')
         const limitData = await limitResponse.json()
@@ -144,7 +92,7 @@ export default function Home() {
           setError(data.error || '生成故事失败')
         }
       }
-    } catch (err) {
+    } catch {
       setError('网络错误，请稍后重试')
     } finally {
       setLoading(false)
@@ -158,7 +106,7 @@ export default function Home() {
     }
 
     // Optimistic update
-    setStories(prev => prev.map(story => 
+    setMyStories(prev => prev.map(story => 
       story.id === storyId 
         ? { ...story, likes: currentLikes + 1 }
         : story
@@ -177,48 +125,27 @@ export default function Home() {
 
       if (response.ok) {
         localStorage.setItem('likedStories', JSON.stringify([...likedStories, storyId]))
-        setStories(prev => prev.map(story => 
+        setMyStories(prev => prev.map(story => 
           story.id === storyId 
             ? { ...story, likes: data.likes }
             : story
         ))
       } else {
         // Revert on error
-        setStories(prev => prev.map(story => 
+        setMyStories(prev => prev.map(story => 
           story.id === storyId 
             ? { ...story, likes: currentLikes }
             : story
         ))
       }
-    } catch (err) {
+    } catch {
       // Revert on error
-      setStories(prev => prev.map(story => 
+      setMyStories(prev => prev.map(story => 
         story.id === storyId 
           ? { ...story, likes: currentLikes }
           : story
       ))
     }
-  }
-
-  const isLiked = (storyId: string) => {
-    if (typeof window === 'undefined') return false
-    const likedStories = JSON.parse(localStorage.getItem('likedStories') || '[]')
-    return likedStories.includes(storyId)
-  }
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diff = now.getTime() - date.getTime()
-    const minutes = Math.floor(diff / 60000)
-    const hours = Math.floor(diff / 3600000)
-    const days = Math.floor(diff / 86400000)
-
-    if (minutes < 1) return '刚刚'
-    if (minutes < 60) return `${minutes}分钟前`
-    if (hours < 24) return `${hours}小时前`
-    if (days < 7) return `${days}天前`
-    return date.toLocaleDateString('zh-CN')
   }
 
   return (
@@ -228,7 +155,7 @@ export default function Home() {
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Header */}
         <motion.header 
-          className="text-center mb-12"
+          className="text-center mb-8"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
@@ -237,9 +164,10 @@ export default function Home() {
             <Sparkles className="w-10 h-10 text-purple-500" />
             字成故事
           </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-300">
+          <p className="text-lg text-gray-600 dark:text-gray-300 mb-6">
             输入1-3个字，AI为你创作一个有趣又引人思考的故事
           </p>
+          <Navigation />
         </motion.header>
 
         {/* Input Form */}
@@ -338,151 +266,44 @@ export default function Home() {
           </form>
         </motion.div>
 
-        {/* Search and Sort */}
-        <motion.div 
-          className="mb-6 space-y-4"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-        >
-          <div className="flex flex-col sm:flex-row gap-4">
-            {/* Search */}
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="搜索故事..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-              />
-            </div>
-            
-            {/* Sort */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => setSortBy('created_at')}
-                className={`px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-2 ${
-                  sortBy === 'created_at'
-                    ? 'bg-blue-500 text-white shadow-md'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-2 border-gray-300 dark:border-gray-600'
-                }`}
-              >
-                <Clock className="w-4 h-4" />
-                最新
-              </button>
-              <button
-                onClick={() => setSortBy('likes')}
-                className={`px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-2 ${
-                  sortBy === 'likes'
-                    ? 'bg-blue-500 text-white shadow-md'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-2 border-gray-300 dark:border-gray-600'
-                }`}
-              >
-                <TrendingUp className="w-4 h-4" />
-                热门
-              </button>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Stories List */}
-        <div className="space-y-6">
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-            <Sparkles className="w-6 h-6 text-purple-500" />
-            故事列表
-            {pagination && (
-              <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
-                ({pagination.total} 个故事)
-              </span>
-            )}
-          </h2>
-          
-          {loadingStories && stories.length === 0 ? (
-            <div className="space-y-6">
-              {[...Array(3)].map((_, i) => (
-                <StorySkeleton key={i} />
+        {/* My Stories */}
+        {myStories.length > 0 && (
+          <motion.div 
+            className="space-y-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+              <Sparkles className="w-6 h-6 text-purple-500" />
+              我的创作
+            </h2>
+            <AnimatePresence>
+              {myStories.map((story, index) => (
+                <StoryCard
+                  key={story.id}
+                  story={story}
+                  onLike={handleLike}
+                  isLiked={isLiked}
+                  formatDate={formatDate}
+                  index={index}
+                />
               ))}
-            </div>
-          ) : stories.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-center py-12 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700"
-            >
-              <p className="text-gray-500 dark:text-gray-400 text-lg">
-                {searchQuery ? '没有找到相关故事' : '还没有故事，快来创作第一个吧！'}
-              </p>
-            </motion.div>
-          ) : (
-            <InfiniteScroll
-              dataLength={stories.length}
-              next={() => fetchStories()}
-              hasMore={hasMore}
-              loader={
-                <div className="flex justify-center py-8">
-                  <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-                </div>
-              }
-              endMessage={
-                <p className="text-center text-gray-500 dark:text-gray-400 py-8">
-                  没有更多故事了
-                </p>
-              }
-            >
-              <AnimatePresence>
-                {stories.map((story, index) => (
-                  <motion.div
-                    key={story.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.3, delay: index * 0.05 }}
-                    className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg p-6 mb-6 hover:shadow-xl transition-all duration-300 border border-gray-200 dark:border-gray-700"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <div className="inline-block bg-gradient-to-r from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 text-blue-800 dark:text-blue-300 font-semibold px-4 py-1 rounded-full text-sm mb-2">
-                          {story.words}
-                        </div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {formatDate(story.created_at)}
-                        </p>
-                      </div>
-                      <motion.button
-                        onClick={() => handleLike(story.id, story.likes)}
-                        disabled={isLiked(story.id)}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${
-                          isLiked(story.id)
-                            ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 cursor-not-allowed'
-                            : 'bg-gray-100 dark:bg-gray-700 hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400'
-                        }`}
-                        whileHover={!isLiked(story.id) ? { scale: 1.05 } : {}}
-                        whileTap={!isLiked(story.id) ? { scale: 0.95 } : {}}
-                      >
-                        <motion.div
-                          animate={isLiked(story.id) ? { scale: [1, 1.2, 1] } : {}}
-                          transition={{ duration: 0.3 }}
-                        >
-                          <Heart 
-                            className={`w-5 h-5 ${isLiked(story.id) ? 'fill-current' : ''}`}
-                          />
-                        </motion.div>
-                        <span className="font-semibold">{story.likes}</span>
-                      </motion.button>
-                    </div>
-                    <div className="prose max-w-none dark:prose-invert">
-                      <p className="text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
-                        {story.content}
-                      </p>
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </InfiniteScroll>
-          )}
-        </div>
+            </AnimatePresence>
+          </motion.div>
+        )}
+
+        {myStories.length === 0 && !loading && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center py-12 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700"
+          >
+            <p className="text-gray-500 dark:text-gray-400 text-lg">
+              还没有创作故事，快来创作第一个吧！
+            </p>
+          </motion.div>
+        )}
       </div>
     </div>
   )
