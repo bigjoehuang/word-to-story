@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { createErrorResponse, createSuccessResponse, validateUUID, handleDatabaseError } from '@/lib/api-utils'
+import { createErrorResponse, createSuccessResponse, validateDeviceId, validateUUID, handleDatabaseError } from '@/lib/api-utils'
 import { 
   getClientIdentifier, 
   checkRateLimitDB, 
@@ -18,10 +18,10 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('请求体过大', 413)
     }
 
-    const { storyId } = await request.json()
+    const { storyId, deviceId } = await request.json()
 
-    // 速率限制检查
-    const identifier = getClientIdentifier(request)
+    // 速率限制检查（基于设备ID/IP）
+    const identifier = getClientIdentifier(request, deviceId)
     const rateLimitResult = await checkRateLimitDB(
       identifier,
       RATE_LIMIT_CONFIGS.LIKE
@@ -35,7 +35,40 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('缺少或无效的故事ID', 400)
     }
 
-    // Get existing story
+    if (!validateDeviceId(deviceId)) {
+      return createErrorResponse('缺少设备ID', 400)
+    }
+
+    // 1. 先尝试插入一条 story_likes 记录（依赖 UNIQUE(story_id, user_id) 保证幂等）
+    const { error: likeInsertError } = await supabaseAdmin
+      .from('story_likes')
+      .insert({
+        story_id: storyId,
+        user_id: deviceId,
+      })
+
+    // 如果违反唯一约束，说明这个设备已经点过赞了，直接返回当前 likes 值，不再重复加一
+    if (likeInsertError?.code === '23505') {
+      const { data: existingStory, error: fetchError } = await supabaseAdmin
+        .from('stories')
+        .select('likes')
+        .eq('id', storyId)
+        .single()
+
+      if (fetchError || !existingStory) {
+        return createErrorResponse('故事不存在', 404)
+      }
+
+      return createSuccessResponse({
+        likes: existingStory.likes || 0,
+      })
+    }
+
+    if (likeInsertError) {
+      return handleDatabaseError(likeInsertError, '点赞失败')
+    }
+
+    // 2. 只有在成功写入 story_likes 时，才对 stories.likes +1，保证数字准确
     const { data: existingStory, error: fetchError } = await supabaseAdmin
       .from('stories')
       .select('likes')
@@ -46,23 +79,23 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('故事不存在', 404)
     }
 
-    // Update likes count
-    // Note: Duplicate prevention is handled on the client side using localStorage
+    const currentLikes = existingStory.likes || 0
+
     const { data: updatedStory, error: updateError } = await supabaseAdmin
       .from('stories')
-      .update({ 
-        likes: (existingStory.likes || 0) + 1
+      .update({
+        likes: currentLikes + 1,
       })
       .eq('id', storyId)
       .select('likes')
       .single()
 
-    if (updateError) {
+    if (updateError || !updatedStory) {
       return handleDatabaseError(updateError, '点赞失败')
     }
 
-    return createSuccessResponse({ 
-      likes: updatedStory.likes 
+    return createSuccessResponse({
+      likes: updatedStory.likes,
     })
   } catch (error) {
     return handleDatabaseError(error, '服务器错误')

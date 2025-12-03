@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { User } from 'lucide-react'
 import { ensureNickname, getStoredNickname } from '@/lib/nickname'
+import { getDeviceId } from '@/lib/deviceId'
 
 export default function NicknameBadge() {
   const [nickname, setNickname] = useState<string | null>(null)
@@ -16,6 +17,24 @@ export default function NicknameBadge() {
         // 先尝试本地存储，避免每次都弹窗
         const local = getStoredNickname()
         if (local) {
+          // 确保后端 profiles 表也有这条记录（兼容老用户本地已有昵称但表里还没有的情况）
+          const deviceId = getDeviceId()
+          if (deviceId) {
+            ;(async () => {
+              try {
+                await fetch('/api/profile', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ deviceId, nickname: local }),
+                })
+              } catch {
+                // 同步失败忽略，不影响前端显示
+              }
+            })()
+          }
+
           if (!isMounted) return
           setNickname(local)
           setLoading(false)

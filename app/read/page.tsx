@@ -16,6 +16,7 @@ import HighlightableText from '@/components/HighlightableText'
 import { Story } from '@/types/story'
 import { useReadingSettings, fontFamilyMap, fontSizeMap } from '@/lib/readingSettings'
 import { isLiked } from '@/lib/utils'
+import { getDeviceId } from '@/lib/deviceId'
 
 function ReadPageContent() {
   const searchParams = useSearchParams()
@@ -105,12 +106,13 @@ function ReadPageContent() {
     ))
 
     try {
+      const deviceId = getDeviceId()
       const response = await fetch('/api/like', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ storyId }),
+        body: JSON.stringify({ storyId, deviceId }),
       })
 
       const data = await response.json()

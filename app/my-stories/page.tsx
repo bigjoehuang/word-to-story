@@ -9,6 +9,7 @@ import StoryCard from '@/components/StoryCard'
 import ReadingSettings from '@/components/ReadingSettings'
 import { Story } from '@/types/story'
 import { formatDate, isLiked } from '@/lib/utils'
+import { getDeviceId } from '@/lib/deviceId'
 
 export default function MyStoriesPage() {
   const [myStories, setMyStories] = useState<Story[]>([])
@@ -56,12 +57,13 @@ export default function MyStoriesPage() {
     ))
 
     try {
+      const deviceId = getDeviceId()
       const response = await fetch('/api/like', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ storyId }),
+        body: JSON.stringify({ storyId, deviceId }),
       })
 
       const data = await response.json()

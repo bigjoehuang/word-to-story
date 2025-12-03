@@ -10,8 +10,8 @@ import GenerationProgress from '@/components/GenerationProgress'
 import ReadingSettings from '@/components/ReadingSettings'
 import { Story } from '@/types/story'
 import { formatDate, isLiked } from '@/lib/utils'
-import { saveGenerationTime } from '@/lib/generationTime'
 import { getDeviceId } from '@/lib/deviceId'
+import { saveGenerationTime } from '@/lib/generationTime'
 import { ensureNickname } from '@/lib/nickname'
 
 export default function Home() {
@@ -148,12 +148,13 @@ export default function Home() {
     }
 
     try {
+      const deviceId = getDeviceId()
       const response = await fetch('/api/like', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ storyId }),
+        body: JSON.stringify({ storyId, deviceId }),
       })
 
       const data = await response.json()
