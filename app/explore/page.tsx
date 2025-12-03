@@ -86,8 +86,16 @@ export default function ExplorePage() {
           </h2>
           
           {loading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 py-4">
+              {Array.from({ length: 10 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 p-6 animate-pulse"
+                >
+                  <div className="h-8 w-8 mx-auto mb-3 rounded-full bg-gray-200 dark:bg-gray-700" />
+                  <div className="h-3 w-16 mx-auto rounded bg-gray-200 dark:bg-gray-700" />
+                </div>
+              ))}
             </div>
           ) : error ? (
             <motion.div

@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS stories (
 -- Create index for faster queries
 CREATE INDEX IF NOT EXISTS idx_stories_created_at ON stories(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_stories_ip_date ON stories(ip_address, created_at);
+CREATE INDEX IF NOT EXISTS idx_stories_words ON stories(words);
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE stories ENABLE ROW LEVEL SECURITY;
