@@ -14,6 +14,40 @@ import { getDeviceId } from '@/lib/deviceId'
 import { saveGenerationTime } from '@/lib/generationTime'
 import { ensureNickname } from '@/lib/nickname'
 
+type StoryStyle = 'default' | 'warm' | 'humor' | 'realistic' | 'fantasy'
+
+const STORY_STYLES: {
+  id: StoryStyle
+  name: string
+  description: string
+}[] = [
+  {
+    id: 'default',
+    name: '默认风格',
+    description: '整体平衡，有趣又引人思考（当前正在使用的默认写作风格）',
+  },
+  {
+    id: 'warm',
+    name: '温暖治愈',
+    description: '基调温柔，关注情感与陪伴，在细腻的日常里慢慢给出启发',
+  },
+  {
+    id: 'humor',
+    name: '幽默启发',
+    description: '语气更轻松有趣，用一点幽默包装背后的道理，但不会变成纯搞笑段子',
+  },
+  {
+    id: 'realistic',
+    name: '现实写实',
+    description: '更贴近日常生活，用真实细节刻画出普通人身上耐人寻味的哲理',
+  },
+  {
+    id: 'fantasy',
+    name: '奇幻寓言',
+    description: '适度加入奇幻或象征设定，像寓言一样在故事情节背后藏着思考',
+  },
+]
+
 export default function Home() {
   const [words, setWords] = useState('')
   const [loading, setLoading] = useState(false)
@@ -21,6 +55,8 @@ export default function Home() {
   const [latestStory, setLatestStory] = useState<Story | null>(null)
   const [error, setError] = useState('')
   const [dailyLimit, setDailyLimit] = useState({ limit: 5, used: 0, remaining: 5 })
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [storyStyle, setStoryStyle] = useState<StoryStyle>('default')
   const isGeneratingRef = useRef(false)
 
   // Fetch daily limit
@@ -93,7 +129,7 @@ export default function Home() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ words: trimmedWords, deviceId }),
+        body: JSON.stringify({ words: trimmedWords, deviceId, style: storyStyle }),
       })
 
       const data = await response.json()
@@ -282,6 +318,69 @@ export default function Home() {
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* Advanced settings */}
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
+              <button
+                type="button"
+                className="text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1"
+                onClick={() => setShowAdvanced((prev) => !prev)}
+              >
+                高级设置
+                <span className="text-xs">
+                  {showAdvanced ? '（收起）' : '（选择故事风格）'}
+                </span>
+              </button>
+
+              <AnimatePresence initial={false}>
+                {showAdvanced && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mt-3 space-y-2 overflow-hidden"
+                  >
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      不同风格只是在语言氛围上略有侧重，都会保持「有趣又引人思考」的整体基调。
+                    </p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {STORY_STYLES.map((style) => (
+                        <label
+                          key={style.id}
+                          className={`flex items-start gap-2 rounded-lg border px-3 py-2 cursor-pointer text-sm transition-colors ${
+                            storyStyle === style.id
+                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
+                              : 'border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-400'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="story-style"
+                            value={style.id}
+                            checked={storyStyle === style.id}
+                            onChange={() => setStoryStyle(style.id)}
+                            className="mt-1 accent-blue-500"
+                          />
+                          <div>
+                            <div className="font-medium text-gray-800 dark:text-gray-100">
+                              {style.name}
+                              {style.id === 'default' && (
+                                <span className="ml-1 text-xs text-blue-600 dark:text-blue-400">
+                                  （默认）
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {style.description}
+                            </p>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
             {/* Generation Progress */}
             <GenerationProgress 

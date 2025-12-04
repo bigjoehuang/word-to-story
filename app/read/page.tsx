@@ -14,7 +14,14 @@ import TopBar from '@/components/TopBar'
 import ReadingSettings from '@/components/ReadingSettings'
 import HighlightableText from '@/components/HighlightableText'
 import { Story } from '@/types/story'
-import { useReadingSettings, fontFamilyMap, fontSizeMap } from '@/lib/readingSettings'
+import { 
+  useReadingSettings, 
+  fontFamilyMap, 
+  fontSizeMap,
+  themeMap,
+  lineSpacingMap,
+  letterSpacingMap
+} from '@/lib/readingSettings'
 import { isLiked, isRead, markRead } from '@/lib/utils'
 import { getDeviceId } from '@/lib/deviceId'
 import { ensureNickname } from '@/lib/nickname'
@@ -35,7 +42,31 @@ function ReadPageContent() {
   const [reGenerating, setReGenerating] = useState(false)
   const [reGenerateError, setReGenerateError] = useState('')
   const isRegeneratingRef = useRef(false)
-  const { fontFamily, fontSize } = useReadingSettings()
+  const { fontFamily, fontSize, theme, lineSpacing, letterSpacing } = useReadingSettings()
+  const [isDarkMode, setIsDarkMode] = useState(false)
+
+  // Detect dark mode
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDarkMode(
+        window.matchMedia('(prefers-color-scheme: dark)').matches ||
+        document.documentElement.classList.contains('dark')
+      )
+    }
+    checkDarkMode()
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    mediaQuery.addEventListener('change', checkDarkMode)
+    // Also listen for class changes on html element
+    const observer = new MutationObserver(checkDarkMode)
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    })
+    return () => {
+      mediaQuery.removeEventListener('change', checkDarkMode)
+      observer.disconnect()
+    }
+  }, [])
 
   // Fetch stories for the word
   useEffect(() => {
@@ -313,7 +344,14 @@ function ReadPageContent() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3 }}
-              className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg p-8 border border-gray-200 dark:border-gray-700"
+              className="rounded-2xl shadow-lg p-8 border border-gray-200 dark:border-gray-700"
+              style={{
+                background: `linear-gradient(to bottom right, ${
+                  isDarkMode ? themeMap[theme].dark.from : themeMap[theme].light.from
+                }, ${
+                  isDarkMode ? themeMap[theme].dark.to : themeMap[theme].light.to
+                })`,
+              }}
             >
               {/* Story Image */}
               {currentStory.image_url && (
@@ -336,10 +374,12 @@ function ReadPageContent() {
               {/* Story Content */}
               <div className="prose max-w-none dark:prose-invert">
                 <div 
-                  className="text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap"
+                  className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap"
                   style={{
                     fontFamily: fontFamilyMap[fontFamily],
                     fontSize: fontSizeMap[fontSize],
+                    lineHeight: lineSpacingMap[lineSpacing],
+                    letterSpacing: letterSpacingMap[letterSpacing],
                   }}
                 >
                   <HighlightableText 

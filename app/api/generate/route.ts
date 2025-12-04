@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('请求体过大', 413)
     }
 
-    const { words, deviceId } = await request.json()
+    const { words, deviceId, style } = await request.json()
 
     // 速率限制检查（在验证之前，防止滥用）
     const identifier = getClientIdentifier(request, deviceId)
@@ -130,12 +130,42 @@ export async function POST(request: NextRequest) {
 
       const wordCount = trimmedWords.length
       const wordDesc = wordCount === 1 ? '这个字' : wordCount === 2 ? '这两个字' : '这三个字'
-      
-      const prompt = `请根据「${trimmedWords}」${wordDesc}，用「简体中文」创作一个有趣又引人思考的短故事。故事应该：
+
+      const safeStyle =
+        typeof style === 'string'
+          ? (style as string)
+          : 'default'
+
+      const basePrompt = `请根据「${trimmedWords}」${wordDesc}，用「简体中文」创作一个有趣又引人思考的短故事。故事应该：
 1. 围绕${wordDesc}展开
 2. 有创意和想象力
 3. 能引发读者的思考
-4. 长度控制在300-500字左右
+4. 长度控制在300-500字左右`
+
+      let styleInstruction = ''
+      switch (safeStyle) {
+        case 'warm':
+          styleInstruction =
+            '\n5. 故事整体氛围偏温柔、治愈，多一点情感与陪伴感，在引发思考的同时给读者细腻的安慰'
+          break
+        case 'humor':
+          styleInstruction =
+            '\n5. 语言可以稍微轻松幽默，用有趣细节包装背后的道理，但不要写成纯搞笑段子或网络段子体'
+          break
+        case 'realistic':
+          styleInstruction =
+            '\n5. 场景和人物更贴近日常生活，通过具体而真实的细节，让读者在熟悉感中体会到现实里的哲理'
+          break
+        case 'fantasy':
+          styleInstruction =
+            '\n5. 可以适当加入奇幻或象征性的设定，让故事更像现代寓言，在情节与意象背后藏着思考'
+          break
+        default:
+          // 保持现有默认风格，不额外添加限制
+          styleInstruction = ''
+      }
+
+      const prompt = `${basePrompt}${styleInstruction}
 
 请直接输出故事内容，不要包含标题或其他说明文字，也不要使用繁体中文。`
 

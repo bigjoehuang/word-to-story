@@ -3,14 +3,40 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Type, Minus, Plus, ChevronDown } from 'lucide-react'
-import { useReadingSettings, fontFamilyLabels, fontSizeLabels, FontFamily, FontSize } from '@/lib/readingSettings'
+import { 
+  useReadingSettings, 
+  fontFamilyLabels, 
+  fontSizeLabels,
+  themeLabels,
+  lineSpacingLabels,
+  letterSpacingLabels,
+  FontFamily, 
+  FontSize,
+  ReadingTheme,
+  LineSpacing,
+  LetterSpacing
+} from '@/lib/readingSettings'
 
 export default function ReadingSettings() {
-  const { fontFamily, fontSize, setFontFamily, setFontSize } = useReadingSettings()
+  const { 
+    fontFamily, 
+    fontSize, 
+    theme,
+    lineSpacing,
+    letterSpacing,
+    setFontFamily, 
+    setFontSize,
+    setTheme,
+    setLineSpacing,
+    setLetterSpacing
+  } = useReadingSettings()
   const [showMenu, setShowMenu] = useState(false)
 
   const fontFamilies: FontFamily[] = ['system', 'serif', 'sans-serif', 'monospace', 'kaiti', 'songti']
   const fontSizes: FontSize[] = ['small', 'medium', 'large', 'xlarge']
+  const themes: ReadingTheme[] = ['default', 'paper', 'eye-care', 'dark']
+  const lineSpacings: LineSpacing[] = ['tight', 'normal', 'relaxed', 'loose']
+  const letterSpacings: LetterSpacing[] = ['tight', 'normal', 'wide']
 
   const handleFontSizeDecrease = () => {
     const currentIndex = fontSizes.indexOf(fontSize)
@@ -56,9 +82,34 @@ export default function ReadingSettings() {
               initial={{ opacity: 0, y: 10, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.95 }}
-              className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden"
-              style={{ top: '100%' }}
+              className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 overflow-y-auto"
+              style={{ 
+                top: '100%',
+                maxHeight: 'calc(100vh - 6rem)',
+              }}
             >
+              {/* Reading Theme Selection */}
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">阅读主题</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {themes.map((t) => (
+                    <motion.button
+                      key={t}
+                      onClick={() => setTheme(t)}
+                      className={`px-3 py-2 rounded-md text-sm transition-colors ${
+                        theme === t
+                          ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      {themeLabels[t]}
+                    </motion.button>
+                  ))}
+                </div>
+              </div>
+
               {/* Font Family Selection */}
               <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                 <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">字体</h3>
@@ -82,7 +133,7 @@ export default function ReadingSettings() {
               </div>
 
               {/* Font Size Control */}
-              <div className="p-4">
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                 <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">字号</h3>
                 <div className="flex items-center gap-3">
                   <motion.button
@@ -110,6 +161,50 @@ export default function ReadingSettings() {
                   >
                     <Plus className="w-4 h-4" />
                   </motion.button>
+                </div>
+              </div>
+
+              {/* Line Spacing Control */}
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">行间距</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {lineSpacings.map((spacing) => (
+                    <motion.button
+                      key={spacing}
+                      onClick={() => setLineSpacing(spacing)}
+                      className={`px-3 py-2 rounded-md text-sm transition-colors ${
+                        lineSpacing === spacing
+                          ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      {lineSpacingLabels[spacing]}
+                    </motion.button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Letter Spacing Control */}
+              <div className="p-4 pb-5">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">字间距</h3>
+                <div className="grid grid-cols-3 gap-2">
+                  {letterSpacings.map((spacing) => (
+                    <motion.button
+                      key={spacing}
+                      onClick={() => setLetterSpacing(spacing)}
+                      className={`px-3 py-2 rounded-md text-sm transition-colors ${
+                        letterSpacing === spacing
+                          ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      {letterSpacingLabels[spacing]}
+                    </motion.button>
+                  ))}
                 </div>
               </div>
             </motion.div>

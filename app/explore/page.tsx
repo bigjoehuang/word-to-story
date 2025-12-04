@@ -18,28 +18,45 @@ interface WordCount {
   count: number
 }
 
-const WORDS_CACHE_KEY = 'explore_words_cache'
+const WORDS_CACHE_KEY = 'explore_words_cache_1'
+const PAGE_SIZE = 20
 
 export default function ExplorePage() {
   const [words, setWords] = useState<WordCount[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
   const router = useRouter()
 
   useEffect(() => {
-    const fetchWords = async (showSkeleton: boolean) => {
+    const fetchWords = async (pageToLoad: number, showSkeleton: boolean) => {
       try {
         if (showSkeleton) {
           setLoading(true)
         }
-        const response = await fetch('/api/words')
+        const response = await fetch(`/api/words?page=${pageToLoad}&limit=${PAGE_SIZE}`)
         const data = await response.json()
         
         if (response.ok) {
           const list = data.words || []
           setWords(list)
+          setPage(data.page || pageToLoad)
+          setTotal(data.total || list.length || 0)
+          setTotalPages(data.totalPages || 1)
           if (typeof window !== 'undefined') {
-            window.sessionStorage.setItem(WORDS_CACHE_KEY, JSON.stringify(list))
+              // 只缓存第一页，避免缓存过多数据
+            if (pageToLoad === 1) {
+              window.sessionStorage.setItem(
+                WORDS_CACHE_KEY,
+                JSON.stringify({
+                  words: list,
+                  total: data.total || list.length || 0,
+                  totalPages: data.totalPages || 1,
+                })
+              )
+            }
           }
         } else {
           setError(data.error || '获取字列表失败')
@@ -58,9 +75,16 @@ export default function ExplorePage() {
       const cached = window.sessionStorage.getItem(WORDS_CACHE_KEY)
       if (cached) {
         try {
-          const parsed: WordCount[] = JSON.parse(cached)
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setWords(parsed)
+          const parsed = JSON.parse(cached) as {
+            words: WordCount[]
+            total?: number
+            totalPages?: number
+          }
+          if (Array.isArray(parsed.words) && parsed.words.length > 0) {
+            setWords(parsed.words)
+            setTotal(parsed.total || parsed.words.length)
+            setTotalPages(parsed.totalPages || 1)
+            setPage(1)
             setLoading(false)
             hasCached = true
           }
@@ -71,11 +95,37 @@ export default function ExplorePage() {
     }
 
     // 如果没有缓存，展示骨架屏；如果已有缓存，仅在后台静默刷新
-    fetchWords(!hasCached)
+    fetchWords(1, !hasCached)
   }, [])
 
   const handleWordClick = (word: string) => {
     router.push(`/read?word=${encodeURIComponent(word)}`)
+  }
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage === page || newPage < 1 || newPage > totalPages) return
+    // 切换页时展示骨架屏，提升感知
+    setLoading(true)
+    setError('')
+    ;(async () => {
+      try {
+        const response = await fetch(`/api/words?page=${newPage}&limit=${PAGE_SIZE}`)
+        const data = await response.json()
+        if (response.ok) {
+          const list = data.words || []
+          setWords(list)
+          setPage(data.page || newPage)
+          setTotal(data.total || list.length || 0)
+          setTotalPages(data.totalPages || 1)
+        } else {
+          setError(data.error || '获取字列表失败')
+        }
+      } catch {
+        setError('网络错误')
+      } finally {
+        setLoading(false)
+      }
+    })()
   }
 
   return (
@@ -106,9 +156,9 @@ export default function ExplorePage() {
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
             <BookOpen className="w-6 h-6 text-purple-500" />
             按字浏览
-            {words.length > 0 && (
+            {total > 0 && (
               <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
-                ({words.length} 个字)
+                ({total} 个字)
               </span>
             )}
           </h2>
@@ -144,29 +194,55 @@ export default function ExplorePage() {
               </p>
             </motion.div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {words.map((item, index) => (
-                <motion.button
-                  key={item.word}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.2, delay: index * 0.02 }}
-                  onClick={() => handleWordClick(item.word)}
-                  className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 p-6 border border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 group"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-gray-800 dark:text-white mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                      {item.word}
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {words.map((item, index) => (
+                  <motion.button
+                    key={item.word}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.2, delay: index * 0.02 }}
+                    onClick={() => handleWordClick(item.word)}
+                    className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 p-6 border border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 group"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-gray-800 dark:text-white mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                        {item.word}
+                      </div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                        {item.count} 个故事
+                      </div>
                     </div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">
-                      {item.count} 个故事
-                    </div>
-                  </div>
-                </motion.button>
-              ))}
-            </div>
+                  </motion.button>
+                ))}
+              </div>
+
+              {totalPages > 1 && (
+                <div className="mt-6 flex items-center justify-center gap-4 text-sm text-gray-600 dark:text-gray-300">
+                  <button
+                    type="button"
+                    onClick={() => handlePageChange(page - 1)}
+                    disabled={page <= 1}
+                    className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed hover:border-blue-500 dark:hover:border-blue-400 transition-all"
+                  >
+                    上一页
+                  </button>
+                  <span>
+                    第 <span className="font-semibold">{page}</span> / {totalPages} 页
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handlePageChange(page + 1)}
+                    disabled={page >= totalPages}
+                    className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed hover:border-blue-500 dark:hover:border-blue-400 transition-all"
+                  >
+                    下一页
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

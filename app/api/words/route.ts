@@ -3,8 +3,16 @@ import { supabase } from '@/lib/supabase'
 import { createErrorResponse, createSuccessResponse, handleDatabaseError } from '@/lib/api-utils'
 import type { WordCount } from '@/types/api'
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
+    const searchParams = request.nextUrl.searchParams
+    const pageParam = searchParams.get('page')
+    const limitParam = searchParams.get('limit')
+
+    const page = Math.max(1, Number.isFinite(Number(pageParam)) ? Number(pageParam) : 1)
+    const limitRaw = Number.isFinite(Number(limitParam)) ? Number(limitParam) : 60
+    const limit = Math.min(Math.max(1, limitRaw), 100)
+
     // 直接在数据库中按 words 分组统计，避免把所有故事拉到内存里再聚合
     const { data, error } = await supabase
       .from('stories')
@@ -23,13 +31,23 @@ export async function GET(_request: NextRequest) {
       wordCounts.set(word, (wordCounts.get(word) || 0) + 1)
     })
 
-    const wordsList: WordCount[] = Array.from(wordCounts.entries())
+    const allWords: WordCount[] = Array.from(wordCounts.entries())
       .map(([word, count]) => ({ word, count }))
       .sort((a, b) => b.count - a.count)
 
+    const total = allWords.length
+    const totalPages = total === 0 ? 1 : Math.ceil(total / limit)
+    const safePage = Math.min(page, totalPages)
+    const start = (safePage - 1) * limit
+    const end = start + limit
+    const pagedWords = allWords.slice(start, end)
+
     return createSuccessResponse({
-      words: wordsList,
-      total: wordsList.length
+      words: pagedWords,
+      total,
+      page: safePage,
+      limit,
+      totalPages,
     })
   } catch (error) {
     return handleDatabaseError(error, '服务器错误')
