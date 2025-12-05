@@ -13,8 +13,15 @@ import { formatDate, isLiked } from '@/lib/utils'
 import { getDeviceId } from '@/lib/deviceId'
 import { saveGenerationTime } from '@/lib/generationTime'
 import { ensureNickname } from '@/lib/nickname'
+import { 
+  ALL_CHARACTERS, 
+  getCharactersByCategory, 
+  getCategories,
+  type Character 
+} from '@/lib/character-dict'
 
 type StoryStyle = 'default' | 'warm' | 'humor' | 'realistic' | 'fantasy'
+type CharacterType = 'none' | 'custom' | 'preset'
 
 const STORY_STYLES: {
   id: StoryStyle
@@ -57,6 +64,10 @@ export default function Home() {
   const [dailyLimit, setDailyLimit] = useState({ limit: 5, used: 0, remaining: 5 })
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [storyStyle, setStoryStyle] = useState<StoryStyle>('default')
+  const [characterType, setCharacterType] = useState<CharacterType>('none')
+  const [customCharacterName, setCustomCharacterName] = useState('')
+  const [selectedCharacterId, setSelectedCharacterId] = useState<string>('')
+  const [characterCategory, setCharacterCategory] = useState<'wuxia' | 'modern' | 'history' | 'classic' | 'anime' | 'fairy-tale' | 'world-leaders' | 'unique-personalities' | 'cultural-icons'>('wuxia')
   const isGeneratingRef = useRef(false)
 
   // Fetch daily limit
@@ -124,12 +135,28 @@ export default function Home() {
 
       // 确保当前用户已有昵称（会在需要时提示设置一个，提供随机建议）
       await ensureNickname()
+      
+      // 构建角色信息
+      let characterName: string | undefined
+      if (characterType === 'custom' && customCharacterName.trim()) {
+        characterName = customCharacterName.trim()
+      } else if (characterType === 'preset' && selectedCharacterId) {
+        const character = ALL_CHARACTERS.find(c => c.id === selectedCharacterId)
+        characterName = character?.name
+      }
+      
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ words: trimmedWords, deviceId, style: storyStyle }),
+        body: JSON.stringify({ 
+          words: trimmedWords, 
+          deviceId, 
+          style: storyStyle,
+          characterType: characterType === 'none' ? undefined : characterType,
+          characterName: characterName || undefined,
+        }),
       })
 
       const data = await response.json()
@@ -328,7 +355,7 @@ export default function Home() {
               >
                 高级设置
                 <span className="text-xs">
-                  {showAdvanced ? '（收起）' : '（选择故事风格）'}
+                  {showAdvanced ? '（收起）' : '（选择角色和风格）'}
                 </span>
               </button>
 
@@ -338,44 +365,152 @@ export default function Home() {
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="mt-3 space-y-2 overflow-hidden"
+                    className="mt-3 space-y-4 overflow-hidden"
                   >
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      不同风格只是在语言氛围上略有侧重，都会保持「有趣又引人思考」的整体基调。
-                    </p>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {STORY_STYLES.map((style) => (
-                        <label
-                          key={style.id}
-                          className={`flex items-start gap-2 rounded-lg border px-3 py-2 cursor-pointer text-sm transition-colors ${
-                            storyStyle === style.id
-                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
-                              : 'border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-400'
-                          }`}
-                        >
+                    {/* Character Selection */}
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        主角角色（可选）
+                      </label>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        可以为故事指定主角，让AI围绕这个角色展开故事
+                      </p>
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="radio"
-                            name="story-style"
-                            value={style.id}
-                            checked={storyStyle === style.id}
-                            onChange={() => setStoryStyle(style.id)}
-                            className="mt-1 accent-blue-500"
+                            name="character-type"
+                            value="none"
+                            checked={characterType === 'none'}
+                            onChange={() => setCharacterType('none')}
+                            className="accent-blue-500"
                           />
-                          <div>
-                            <div className="font-medium text-gray-800 dark:text-gray-100">
-                              {style.name}
-                              {style.id === 'default' && (
-                                <span className="ml-1 text-xs text-blue-600 dark:text-blue-400">
-                                  （默认）
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                              {style.description}
-                            </p>
-                          </div>
+                          <span className="text-sm text-gray-700 dark:text-gray-300">不指定角色（AI自动生成）</span>
                         </label>
-                      ))}
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="character-type"
+                            value="custom"
+                            checked={characterType === 'custom'}
+                            onChange={() => setCharacterType('custom')}
+                            className="accent-blue-500"
+                          />
+                          <span className="text-sm text-gray-700 dark:text-gray-300">自定义名字</span>
+                        </label>
+                        {characterType === 'custom' && (
+                          <div className="ml-6">
+                            <input
+                              type="text"
+                              value={customCharacterName}
+                              onChange={(e) => {
+                                const value = e.target.value
+                                // 限制长度和字符（1-10个字符，只允许中文、英文、数字）
+                                if (value.length <= 10 && /^[\u4e00-\u9fa5a-zA-Z0-9]*$/.test(value)) {
+                                  setCustomCharacterName(value)
+                                }
+                              }}
+                              placeholder="输入主角名字（1-10个字符）"
+                              maxLength={10}
+                              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                              disabled={loading}
+                            />
+                          </div>
+                        )}
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="character-type"
+                            value="preset"
+                            checked={characterType === 'preset'}
+                            onChange={() => setCharacterType('preset')}
+                            className="accent-blue-500"
+                          />
+                          <span className="text-sm text-gray-700 dark:text-gray-300">选择系统角色</span>
+                        </label>
+                        {characterType === 'preset' && (
+                          <div className="ml-6 space-y-2">
+                            {/* Category Selection */}
+                            <div className="flex gap-2">
+                              {getCategories().map((cat) => (
+                                <button
+                                  key={cat.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setCharacterCategory(cat.id)
+                                    setSelectedCharacterId('')
+                                  }}
+                                  className={`px-3 py-1 text-xs rounded-lg transition-colors ${
+                                    characterCategory === cat.id
+                                      ? 'bg-blue-500 text-white'
+                                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                                  }`}
+                                >
+                                  {cat.name}
+                                </button>
+                              ))}
+                            </div>
+                            {/* Character Selection */}
+                            <select
+                              value={selectedCharacterId}
+                              onChange={(e) => setSelectedCharacterId(e.target.value)}
+                              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                              disabled={loading}
+                            >
+                              <option value="">请选择角色</option>
+                              {getCharactersByCategory(characterCategory).map((char) => (
+                                <option key={char.id} value={char.id}>
+                                  {char.name} {char.description ? `- ${char.description}` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Story Style Selection */}
+                    <div className="space-y-2 border-t border-gray-200 dark:border-gray-700 pt-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        故事风格
+                      </label>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        不同风格只是在语言氛围上略有侧重，都会保持「有趣又引人思考」的整体基调。
+                      </p>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {STORY_STYLES.map((style) => (
+                          <label
+                            key={style.id}
+                            className={`flex items-start gap-2 rounded-lg border px-3 py-2 cursor-pointer text-sm transition-colors ${
+                              storyStyle === style.id
+                                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
+                                : 'border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-400'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="story-style"
+                              value={style.id}
+                              checked={storyStyle === style.id}
+                              onChange={() => setStoryStyle(style.id)}
+                              className="mt-1 accent-blue-500"
+                            />
+                            <div>
+                              <div className="font-medium text-gray-800 dark:text-gray-100">
+                                {style.name}
+                                {style.id === 'default' && (
+                                  <span className="ml-1 text-xs text-blue-600 dark:text-blue-400">
+                                    （默认）
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {style.description}
+                              </p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
                     </div>
                   </motion.div>
                 )}

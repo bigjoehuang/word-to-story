@@ -8,6 +8,7 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const word = searchParams.get('word')
+    const sortBy = searchParams.get('sortBy') || 'created_at'
 
     if (!word || word.trim().length === 0) {
       return createErrorResponse('请提供字参数', 400)
@@ -15,12 +16,23 @@ export async function GET(request: NextRequest) {
 
     const trimmedWord = word.trim()
 
-    // 获取该字的所有故事（包含作者昵称和音频URL）
-    const { data: stories, error } = await supabase
+    // 构建查询
+    let query = supabase
       .from('stories')
-      .select('id, words, content, likes, created_at, image_url, audio_url, author_nickname')
+      .select('id, words, content, likes, created_at, image_url, audio_url, author_nickname, character_name')
       .eq('words', trimmedWord)
-      .order('created_at', { ascending: false })
+
+    // 添加排序
+    if (sortBy === 'created_at') {
+      query = query.order('created_at', { ascending: false })
+    } else if (sortBy === 'likes') {
+      query = query.order('likes', { ascending: false })
+    } else {
+      // 默认按创建时间排序
+      query = query.order('created_at', { ascending: false })
+    }
+
+    const { data: stories, error } = await query
 
     if (error) {
       return handleDatabaseError(error, '获取故事失败')

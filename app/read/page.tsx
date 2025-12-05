@@ -8,7 +8,8 @@ import {
   Loader2,
   BookOpen,
   Heart,
-  Sparkles
+  Sparkles,
+  ArrowUpDown
 } from 'lucide-react'
 import TopBar from '@/components/TopBar'
 import ReadingSettings from '@/components/ReadingSettings'
@@ -42,6 +43,7 @@ function ReadPageContent() {
   const [canMarkRead, setCanMarkRead] = useState(false)
   const [reGenerating, setReGenerating] = useState(false)
   const [reGenerateError, setReGenerateError] = useState('')
+  const [sortBy, setSortBy] = useState<'created_at' | 'likes'>('created_at')
   const isRegeneratingRef = useRef(false)
   const { fontFamily, fontSize, theme, lineSpacing, letterSpacing } = useReadingSettings()
   const [isDarkMode, setIsDarkMode] = useState(false)
@@ -98,7 +100,7 @@ function ReadPageContent() {
     const fetchStories = async () => {
       try {
         setLoading(true)
-        const response = await fetch(`/api/stories-by-word?word=${encodeURIComponent(word)}`)
+        const response = await fetch(`/api/stories-by-word?word=${encodeURIComponent(word)}&sortBy=${sortBy}`)
         const data = await response.json()
         
         if (response.ok) {
@@ -133,7 +135,7 @@ function ReadPageContent() {
     }
 
     fetchStories()
-  }, [word, storyIdFromQuery])
+  }, [word, storyIdFromQuery, sortBy])
 
   // 处理点赞
   const handleLike = async (storyId: string, currentLikes: number) => {
@@ -294,18 +296,33 @@ function ReadPageContent() {
                   </>
                 )}
               </p>
-              {stories.length > 0 && (
-                <motion.button
-                  onClick={handleRegenerate}
-                  disabled={reGenerating}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-sm hover:from-blue-600 hover:to-purple-600 transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
-                  whileHover={!reGenerating ? { scale: 1.05 } : {}}
-                  whileTap={!reGenerating ? { scale: 0.95 } : {}}
-                >
-                  <Sparkles className="w-4 h-4" />
-                  <span>{reGenerating ? '再次创作中...' : '再次创作'}</span>
-                </motion.button>
-              )}
+              <div className="flex items-center gap-3">
+                {stories.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <ArrowUpDown className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value as 'created_at' | 'likes')}
+                      className="px-3 py-1.5 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                    >
+                      <option value="created_at">按最近的创作时间</option>
+                      <option value="likes">按点赞数</option>
+                    </select>
+                  </div>
+                )}
+                {stories.length > 0 && (
+                  <motion.button
+                    onClick={handleRegenerate}
+                    disabled={reGenerating}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-sm hover:from-blue-600 hover:to-purple-600 transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                    whileHover={!reGenerating ? { scale: 1.05 } : {}}
+                    whileTap={!reGenerating ? { scale: 0.95 } : {}}
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>{reGenerating ? '再次创作中...' : '再次创作'}</span>
+                  </motion.button>
+                )}
+              </div>
             </div>
 
             {/* 故事序号圆点，从新到旧 */}

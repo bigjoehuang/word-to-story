@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('请求体过大', 413)
     }
 
-    const { words, deviceId, style } = await request.json()
+    const { words, deviceId, style, characterType, characterName } = await request.json()
 
     // 速率限制检查（在验证之前，防止滥用）
     const identifier = getClientIdentifier(request, deviceId)
@@ -142,6 +142,18 @@ export async function POST(request: NextRequest) {
 3. 能引发读者的思考
 4. 长度控制在300-500字左右`
 
+      // 处理角色信息
+      let characterInstruction = ''
+      let savedCharacterName: string | null = null
+      if (characterType && characterName && typeof characterName === 'string' && characterName.trim()) {
+        const trimmedCharacterName = characterName.trim()
+        // 验证角色名字长度（1-10个字符）
+        if (trimmedCharacterName.length >= 1 && trimmedCharacterName.length <= 10) {
+          savedCharacterName = trimmedCharacterName
+          characterInstruction = `\n故事的主角是「${trimmedCharacterName}」，请围绕这个角色展开故事。如果这是一个经典角色（如武侠小说或影视作品中的角色），请保持角色的性格特点和背景设定；如果是自定义名字，请根据名字的特点来塑造角色形象。`
+        }
+      }
+
       let styleInstruction = ''
       switch (safeStyle) {
         case 'warm':
@@ -165,7 +177,7 @@ export async function POST(request: NextRequest) {
           styleInstruction = ''
       }
 
-      const prompt = `${basePrompt}${styleInstruction}
+      const prompt = `${basePrompt}${characterInstruction}${styleInstruction}
 
 请直接输出故事内容，不要包含标题或其他说明文字，也不要使用繁体中文。`
 
@@ -242,7 +254,8 @@ export async function POST(request: NextRequest) {
           content: storyContent,
           user_id: deviceId,
           ip_address: null,
-          author_nickname: authorNickname
+          author_nickname: authorNickname,
+          character_name: savedCharacterName
         })
         .select()
         .single()

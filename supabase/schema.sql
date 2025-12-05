@@ -7,13 +7,15 @@ CREATE TABLE IF NOT EXISTS stories (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   ip_address TEXT,
   image_url TEXT,
-  author_nickname TEXT
+  author_nickname TEXT,
+  character_name TEXT
 );
 
 -- Create index for faster queries
 CREATE INDEX IF NOT EXISTS idx_stories_created_at ON stories(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_stories_ip_date ON stories(ip_address, created_at);
 CREATE INDEX IF NOT EXISTS idx_stories_words ON stories(words);
+CREATE INDEX IF NOT EXISTS idx_stories_character_name ON stories(character_name) WHERE character_name IS NOT NULL;
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE stories ENABLE ROW LEVEL SECURITY;

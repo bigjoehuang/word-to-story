@@ -24,3 +24,4 @@ CREATE POLICY "Allow public insert story_likes" ON story_likes
 
 
 
+
