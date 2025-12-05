@@ -66,7 +66,7 @@ export default function Home() {
   const [storyStyle, setStoryStyle] = useState<StoryStyle>('default')
   const [characterType, setCharacterType] = useState<CharacterType>('none')
   const [customCharacterName, setCustomCharacterName] = useState('')
-  const [selectedCharacterId, setSelectedCharacterId] = useState<string>('')
+  const [selectedCharacterIds, setSelectedCharacterIds] = useState<string[]>([])
   const [characterCategory, setCharacterCategory] = useState<'wuxia' | 'modern' | 'history' | 'classic' | 'anime' | 'fairy-tale' | 'world-leaders' | 'unique-personalities' | 'cultural-icons'>('wuxia')
   const isGeneratingRef = useRef(false)
 
@@ -136,13 +136,27 @@ export default function Home() {
       // 确保当前用户已有昵称（会在需要时提示设置一个，提供随机建议）
       await ensureNickname()
       
-      // 构建角色信息
+      // 构建角色信息（支持1-3个角色）
       let characterName: string | undefined
       if (characterType === 'custom' && customCharacterName.trim()) {
-        characterName = customCharacterName.trim()
-      } else if (characterType === 'preset' && selectedCharacterId) {
-        const character = ALL_CHARACTERS.find(c => c.id === selectedCharacterId)
-        characterName = character?.name
+        // 自定义角色：按空格分割，验证数量
+        const names = customCharacterName.trim().split(/\s+/).filter(n => n.length > 0)
+        if (names.length >= 1 && names.length <= 3) {
+          // 验证每个角色名长度（1-10个字符）
+          const validNames = names.filter(n => n.length >= 1 && n.length <= 10)
+          if (validNames.length === names.length) {
+            characterName = validNames.join(' ')
+          }
+        }
+      } else if (characterType === 'preset' && selectedCharacterIds.length > 0) {
+        // 预设角色：最多3个
+        const selectedNames = selectedCharacterIds
+          .slice(0, 3)
+          .map(id => ALL_CHARACTERS.find(c => c.id === id)?.name)
+          .filter((name): name is string => !!name)
+        if (selectedNames.length > 0) {
+          characterName = selectedNames.join(' ')
+        }
       }
       
       const response = await fetch('/api/generate', {
@@ -370,10 +384,10 @@ export default function Home() {
                     {/* Character Selection */}
                     <div className="space-y-2">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        主角角色（可选）
+                        角色（可选，1-3个）
                       </label>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        可以为故事指定主角，让AI围绕这个角色展开故事
+                        可以为故事指定1-3个角色，让AI围绕这些角色展开故事
                       </p>
                       <div className="space-y-2">
                         <label className="flex items-center gap-2 cursor-pointer">
@@ -399,22 +413,36 @@ export default function Home() {
                           <span className="text-sm text-gray-700 dark:text-gray-300">自定义名字</span>
                         </label>
                         {characterType === 'custom' && (
-                          <div className="ml-6">
+                          <div className="ml-6 space-y-2">
                             <input
                               type="text"
                               value={customCharacterName}
                               onChange={(e) => {
                                 const value = e.target.value
-                                // 限制长度和字符（1-10个字符，只允许中文、英文、数字）
-                                if (value.length <= 10 && /^[\u4e00-\u9fa5a-zA-Z0-9]*$/.test(value)) {
+                                // 允许空格分隔的多个角色名，每个角色名1-10个字符
+                                // 使用正则验证：允许中文、英文、数字和空格，但空格不能连续
+                                const parts = value.split(/\s+/).filter(p => p.length > 0)
+                                const isValid = parts.every(part => 
+                                  part.length <= 10 && /^[\u4e00-\u9fa5a-zA-Z0-9]+$/.test(part)
+                                ) && parts.length <= 3
+                                
+                                if (isValid || value === '') {
                                   setCustomCharacterName(value)
                                 }
                               }}
-                              placeholder="输入主角名字（1-10个字符）"
-                              maxLength={10}
+                              placeholder="输入角色名字，用空格分开（1-3个角色，每个1-10个字符）"
                               className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                               disabled={loading}
                             />
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {(() => {
+                                const parts = customCharacterName.trim().split(/\s+/).filter(p => p.length > 0)
+                                const count = parts.length
+                                return count > 0 
+                                  ? `已输入 ${count} 个角色${count > 3 ? '（最多3个）' : ''}`
+                                  : '例如：小明 小红 小刚'
+                              })()}
+                            </p>
                           </div>
                         )}
                         <label className="flex items-center gap-2 cursor-pointer">
@@ -431,14 +459,14 @@ export default function Home() {
                         {characterType === 'preset' && (
                           <div className="ml-6 space-y-2">
                             {/* Category Selection */}
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 flex-wrap">
                               {getCategories().map((cat) => (
                                 <button
                                   key={cat.id}
                                   type="button"
                                   onClick={() => {
                                     setCharacterCategory(cat.id)
-                                    setSelectedCharacterId('')
+                                    // 切换分类时不清除已选角色，允许跨分类选择
                                   }}
                                   className={`px-3 py-1 text-xs rounded-lg transition-colors ${
                                     characterCategory === cat.id
@@ -450,20 +478,80 @@ export default function Home() {
                                 </button>
                               ))}
                             </div>
-                            {/* Character Selection */}
-                            <select
-                              value={selectedCharacterId}
-                              onChange={(e) => setSelectedCharacterId(e.target.value)}
-                              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                              disabled={loading}
-                            >
-                              <option value="">请选择角色</option>
-                              {getCharactersByCategory(characterCategory).map((char) => (
-                                <option key={char.id} value={char.id}>
-                                  {char.name} {char.description ? `- ${char.description}` : ''}
-                                </option>
-                              ))}
-                            </select>
+                            {/* Character Selection - Multi-select with checkboxes */}
+                            <div className="space-y-2">
+                              {/* 显示已选择的角色（所有分类） */}
+                              {selectedCharacterIds.length > 0 && (
+                                <div className="mb-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                                  <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">
+                                    已选择 {selectedCharacterIds.length} / 3 个角色：
+                                  </p>
+                                  <div className="flex flex-wrap gap-1">
+                                    {selectedCharacterIds.map((id) => {
+                                      const char = ALL_CHARACTERS.find(c => c.id === id)
+                                      if (!char) return null
+                                      return (
+                                        <span
+                                          key={id}
+                                          className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300 rounded"
+                                        >
+                                          {char.name}
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setSelectedCharacterIds(selectedCharacterIds.filter(i => i !== id))
+                                            }}
+                                            className="hover:text-blue-900 dark:hover:text-blue-100"
+                                            disabled={loading}
+                                          >
+                                            <X className="w-3 h-3" />
+                                          </button>
+                                        </span>
+                                      )
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                              {/* 当前分类的角色列表 */}
+                              <div className="max-h-48 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                                {getCharactersByCategory(characterCategory).map((char) => {
+                                  const isSelected = selectedCharacterIds.includes(char.id)
+                                  return (
+                                    <label
+                                      key={char.id}
+                                      className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors ${
+                                        isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                                      }`}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={isSelected}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            // 最多选择3个
+                                            if (selectedCharacterIds.length < 3) {
+                                              setSelectedCharacterIds([...selectedCharacterIds, char.id])
+                                            }
+                                          } else {
+                                            setSelectedCharacterIds(selectedCharacterIds.filter(id => id !== char.id))
+                                          }
+                                        }}
+                                        disabled={loading || (!isSelected && selectedCharacterIds.length >= 3)}
+                                        className="accent-blue-500"
+                                      />
+                                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                                        {char.name}
+                                        {char.description && (
+                                          <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">
+                                            - {char.description}
+                                          </span>
+                                        )}
+                                      </span>
+                                    </label>
+                                  )
+                                })}
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>

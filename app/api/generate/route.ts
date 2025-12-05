@@ -142,15 +142,34 @@ export async function POST(request: NextRequest) {
 3. 能引发读者的思考
 4. 长度控制在300-500字左右`
 
-      // 处理角色信息
+      // 处理角色信息（支持1-3个角色，用空格分隔）
       let characterInstruction = ''
       let savedCharacterName: string | null = null
       if (characterType && characterName && typeof characterName === 'string' && characterName.trim()) {
         const trimmedCharacterName = characterName.trim()
-        // 验证角色名字长度（1-10个字符）
-        if (trimmedCharacterName.length >= 1 && trimmedCharacterName.length <= 10) {
-          savedCharacterName = trimmedCharacterName
-          characterInstruction = `\n故事的主角是「${trimmedCharacterName}」，请围绕这个角色展开故事。如果这是一个经典角色（如武侠小说或影视作品中的角色），请保持角色的性格特点和背景设定；如果是自定义名字，请根据名字的特点来塑造角色形象。`
+        // 按空格分割角色名
+        const characterNames = trimmedCharacterName.split(/\s+/).filter(n => n.length > 0)
+        
+        // 验证角色数量（1-3个）
+        if (characterNames.length >= 1 && characterNames.length <= 3) {
+          // 验证每个角色名长度（1-10个字符）和字符类型
+          const validNames = characterNames.filter(name => {
+            return name.length >= 1 && 
+                   name.length <= 10 && 
+                   /^[\u4e00-\u9fa5a-zA-Z0-9]+$/.test(name)
+          })
+          
+          if (validNames.length === characterNames.length) {
+            savedCharacterName = validNames.join(' ')
+            
+            // 生成角色指令
+            if (validNames.length === 1) {
+              characterInstruction = `\n故事的主角是「${validNames[0]}」，请围绕这个角色展开故事。如果这是一个经典角色（如武侠小说或影视作品中的角色），请保持角色的性格特点和背景设定；如果是自定义名字，请根据名字的特点来塑造角色形象。`
+            } else {
+              const namesList = validNames.map(n => `「${n}」`).join('、')
+              characterInstruction = `\n故事的主要角色是${namesList}（共${validNames.length}个角色），请围绕这些角色展开故事。如果这些是经典角色（如武侠小说或影视作品中的角色），请保持角色的性格特点和背景设定；如果是自定义名字，请根据名字的特点来塑造角色形象。确保这些角色在故事中都有适当的戏份和互动。`
+            }
+          }
         }
       }
 
