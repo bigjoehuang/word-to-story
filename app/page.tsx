@@ -23,6 +23,7 @@ import {
 
 type StoryStyle = 'default' | 'warm' | 'humor' | 'realistic' | 'fantasy'
 type CharacterType = 'none' | 'custom' | 'preset'
+type StoryLength = 'short' | 'medium' | 'long'
 
 const STORY_STYLES: {
   id: StoryStyle
@@ -56,6 +57,32 @@ const STORY_STYLES: {
   },
 ]
 
+const STORY_LENGTHS: {
+  id: StoryLength
+  name: string
+  description: string
+  range: string
+}[] = [
+  {
+    id: 'short',
+    name: '短小精干',
+    description: '简洁有力，快速传达核心思想，适合快速阅读',
+    range: '150-250字',
+  },
+  {
+    id: 'medium',
+    name: '适中',
+    description: '平衡长度与深度，有足够空间展开情节和思考（默认）',
+    range: '300-500字',
+  },
+  {
+    id: 'long',
+    name: '较长',
+    description: '更丰富的细节和情节，可以更深入地探讨主题',
+    range: '600-800字',
+  },
+]
+
 export default function Home() {
   const [words, setWords] = useState('')
   const [loading, setLoading] = useState(false)
@@ -66,6 +93,7 @@ export default function Home() {
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [showConfetti, setShowConfetti] = useState(false)
   const [storyStyle, setStoryStyle] = useState<StoryStyle>('default')
+  const [storyLength, setStoryLength] = useState<StoryLength>('medium')
   const [characterType, setCharacterType] = useState<CharacterType>('none')
   const [customCharacterName, setCustomCharacterName] = useState('')
   const [selectedCharacterIds, setSelectedCharacterIds] = useState<string[]>([])
@@ -170,6 +198,7 @@ export default function Home() {
           words: trimmedWords, 
           deviceId, 
           style: storyStyle,
+          length: storyLength,
           characterType: characterType === 'none' ? undefined : characterType,
           characterName: characterName || undefined,
         }),
@@ -578,6 +607,58 @@ export default function Home() {
                             </div>
                           </div>
                         )}
+                      </div>
+                    </div>
+
+                    {/* Story Length Selection */}
+                    <div className="space-y-2 border-t border-gray-200 dark:border-gray-700 pt-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        故事长度
+                      </label>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        选择故事的长度，在保证质量和可读性的前提下调整篇幅。
+                      </p>
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        {STORY_LENGTHS.map((length) => (
+                          <label
+                            key={length.id}
+                            className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                              loading
+                                ? 'cursor-not-allowed opacity-50'
+                                : 'cursor-pointer hover:border-blue-400 dark:hover:border-blue-400'
+                            } ${
+                              storyLength === length.id
+                                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
+                                : 'border-gray-200 dark:border-gray-700'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="story-length"
+                              value={length.id}
+                              checked={storyLength === length.id}
+                              onChange={() => setStoryLength(length.id)}
+                              disabled={loading}
+                              className="mt-1 accent-blue-500"
+                            />
+                            <div>
+                              <div className="font-medium text-gray-800 dark:text-gray-100">
+                                {length.name}
+                                {length.id === 'medium' && (
+                                  <span className="ml-1 text-xs text-blue-600 dark:text-blue-400">
+                                    （默认）
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {length.description}
+                              </p>
+                              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                                {length.range}
+                              </p>
+                            </div>
+                          </label>
+                        ))}
                       </div>
                     </div>
 

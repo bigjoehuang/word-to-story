@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('请求体过大', 413)
     }
 
-    const { words, deviceId, style, characterType, characterName } = await request.json()
+    const { words, deviceId, style, length, characterType, characterName } = await request.json()
 
     // 速率限制检查（在验证之前，防止滥用）
     const identifier = getClientIdentifier(request, deviceId)
@@ -136,11 +136,31 @@ export async function POST(request: NextRequest) {
           ? (style as string)
           : 'default'
 
+      const safeLength =
+        typeof length === 'string' && ['short', 'medium', 'long'].includes(length)
+          ? (length as 'short' | 'medium' | 'long')
+          : 'medium'
+
+      // 根据长度设置不同的字数要求
+      let lengthInstruction = ''
+      switch (safeLength) {
+        case 'short':
+          lengthInstruction = '4. 长度控制在150-250字左右，短小精干，简洁有力，快速传达核心思想'
+          break
+        case 'long':
+          lengthInstruction = '4. 长度控制在600-800字左右，可以有更丰富的细节和情节，更深入地探讨主题'
+          break
+        case 'medium':
+        default:
+          lengthInstruction = '4. 长度控制在300-500字左右，平衡长度与深度'
+          break
+      }
+
       const basePrompt = `请根据「${trimmedWords}」${wordDesc}，用「简体中文」创作一个有趣又引人思考的短故事。故事应该：
 1. 围绕${wordDesc}展开
 2. 有创意和想象力
 3. 能引发读者的思考
-4. 长度控制在300-500字左右`
+${lengthInstruction}`
 
       // 处理角色信息（支持1-3个角色，用空格分隔）
       let characterInstruction = ''
