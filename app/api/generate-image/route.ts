@@ -61,11 +61,11 @@ export async function POST(request: NextRequest) {
     // 处理角色信息，确保配图与角色匹配
     let characterPrompt = ''
     if (story?.character_name) {
-      const characterNames = story.character_name.trim().split(/\s+/).filter(n => n.length > 0)
+      const characterNames = story.character_name.trim().split(/\s+/).filter((n: string) => n.length > 0)
       
       // 检查是否是系统角色
       const systemCharacters = characterNames
-        .map(name => ALL_CHARACTERS.find(char => char.name === name))
+        .map((name: string) => ALL_CHARACTERS.find((char) => char.name === name))
         .filter((char): char is typeof ALL_CHARACTERS[0] => char !== undefined)
       
       if (systemCharacters.length > 0) {
@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
         }).join('；')
         
         // 收集所有角色的风格，用于整体风格要求
-        const styles = systemCharacters.map(char => {
+        const styles = systemCharacters.map((char) => {
           switch (char.category) {
             case 'wuxia': return '武侠风格'
             case 'modern': return '现代或仙侠风格'
@@ -155,7 +155,7 @@ export async function POST(request: NextRequest) {
             default: return '写实风格'
           }
         })
-        const uniqueStyles = [...new Set(styles)]
+        const uniqueStyles = Array.from(new Set(styles))
         const styleRequirement = uniqueStyles.length === 1 
           ? `画面风格必须与角色风格匹配，采用${uniqueStyles[0]}`
           : `画面风格必须与角色风格匹配，主要采用${uniqueStyles[0]}风格`
@@ -166,8 +166,8 @@ export async function POST(request: NextRequest) {
           characterPrompt = `\n【重要】画面中必须准确呈现以下角色：${characterDescriptions}。${styleRequirement}。角色的外观、服饰、特征必须与角色身份完全匹配，不能出现与角色不符的形象。如果故事中有多个角色，画面中应包含所有主要角色。`
         } else {
           // 部分系统角色，部分自定义
-          const customNames = characterNames.filter(name => 
-            !systemCharacters.some(char => char.name === name)
+          const customNames = characterNames.filter((name: string) => 
+            !systemCharacters.some((char) => char.name === name)
           )
           characterPrompt = `\n【重要】画面中必须准确呈现以下角色：${characterDescriptions}${customNames.length > 0 ? `；以及自定义角色：${customNames.join('、')}` : ''}。${styleRequirement}。系统角色的外观、服饰、特征必须与角色身份完全匹配，不能出现与角色不符的形象。`
         }
