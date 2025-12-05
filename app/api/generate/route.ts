@@ -156,7 +156,11 @@ export async function POST(request: NextRequest) {
           break
       }
 
-      const basePrompt = `请根据「${trimmedWords}」${wordDesc}，用「简体中文」创作一个有趣又引人思考的短故事。故事应该：
+      const basePrompt = `请根据「${trimmedWords}」${wordDesc}，用「简体中文」创作一个有趣又引人思考的短故事。
+
+【重要】必须使用简体中文（简化字），严禁使用繁体中文（繁体字）。例如：应使用"说"而非"說"，使用"这"而非"這"，使用"个"而非"個"。
+
+故事应该：
 1. 围绕${wordDesc}展开
 2. 有创意和想象力
 3. 能引发读者的思考
@@ -218,7 +222,12 @@ ${lengthInstruction}`
 
       const prompt = `${basePrompt}${characterInstruction}${styleInstruction}
 
-请直接输出故事内容，不要包含标题或其他说明文字，也不要使用繁体中文。`
+【严格要求】
+1. 请直接输出故事内容，不要包含标题或其他说明文字
+2. 必须使用简体中文，严禁使用任何繁体中文字符
+3. 如果输出中包含繁体字，将被视为错误输出
+
+请确保所有文字都是简体中文，然后直接输出故事内容。`
 
       let response: Response
       try {

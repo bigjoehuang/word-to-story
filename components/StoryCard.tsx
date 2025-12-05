@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Heart, Clock, Image as ImageIcon, Loader2 } from 'lucide-react'
+import { Heart, Clock, Image as ImageIcon, Loader2, Sparkles } from 'lucide-react'
 import { Story } from '@/types/story'
 import HighlightableText from './HighlightableText'
 import { useReadingSettings, fontFamilyMap, fontSizeMap } from '@/lib/readingSettings'
@@ -14,6 +14,9 @@ interface StoryCardProps {
   formatDate: (dateString: string) => string
   index?: number
   onImageGenerated?: (storyId: string, imageUrl: string) => void
+  onRegenerate?: (story: Story) => void
+  isRegenerating?: boolean
+  regenerateError?: string
 }
 
 export default function StoryCard({ 
@@ -22,7 +25,10 @@ export default function StoryCard({
   isLiked, 
   formatDate,
   index = 0,
-  onImageGenerated
+  onImageGenerated,
+  onRegenerate,
+  isRegenerating = false,
+  regenerateError
 }: StoryCardProps) {
   const liked = isLiked(story.id)
   const [generatingImage, setGeneratingImage] = useState(false)
@@ -97,6 +103,27 @@ export default function StoryCard({
           )}
         </div>
         <div className="flex items-center gap-2">
+          {onRegenerate && (
+            <motion.button
+              onClick={() => onRegenerate(story)}
+              disabled={isRegenerating}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-sm hover:from-blue-600 hover:to-purple-600 transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
+              whileHover={!isRegenerating ? { scale: 1.05 } : {}}
+              whileTap={!isRegenerating ? { scale: 0.95 } : {}}
+            >
+              {isRegenerating ? (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>创作中...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3 h-3" />
+                  <span>再次创作</span>
+                </>
+              )}
+            </motion.button>
+          )}
           {!imageUrl && (
             <motion.button
               onClick={handleGenerateImage}
@@ -141,6 +168,13 @@ export default function StoryCard({
           </motion.button>
         </div>
       </div>
+      
+      {/* Regenerate Error */}
+      {regenerateError && (
+        <div className="mb-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+          <p className="text-xs text-red-600 dark:text-red-400">{regenerateError}</p>
+        </div>
+      )}
       
       {/* Story Image */}
       {imageUrl && (

@@ -8,7 +8,6 @@ import {
   Loader2,
   BookOpen,
   Heart,
-  Sparkles,
   ArrowUpDown
 } from 'lucide-react'
 import TopBar from '@/components/TopBar'
@@ -26,7 +25,6 @@ import {
 } from '@/lib/readingSettings'
 import { isLiked, isRead, markRead } from '@/lib/utils'
 import { getDeviceId } from '@/lib/deviceId'
-import { ensureNickname } from '@/lib/nickname'
 
 function ReadPageContent() {
   const searchParams = useSearchParams()
@@ -41,10 +39,7 @@ function ReadPageContent() {
   // 记录当前会话中浏览过的故事索引（仅用于高亮/导航），真实"已读"数量使用 isRead 计算
   const [viewedIndices, setViewedIndices] = useState<Set<number>>(new Set())
   const [canMarkRead, setCanMarkRead] = useState(false)
-  const [reGenerating, setReGenerating] = useState(false)
-  const [reGenerateError, setReGenerateError] = useState('')
   const [sortBy, setSortBy] = useState<'created_at' | 'likes'>('created_at')
-  const isRegeneratingRef = useRef(false)
   const { fontFamily, fontSize, theme, lineSpacing, letterSpacing } = useReadingSettings()
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [audioApiAvailable, setAudioApiAvailable] = useState<boolean | null>(null)
@@ -200,64 +195,6 @@ function ReadPageContent() {
     return () => clearTimeout(timer)
   }, [currentStory?.id])
 
-  // 再次创作当前字的故事（不会跳转页面）
-  const handleRegenerate = async () => {
-    // 使用 ref 确保原子性检查，防止快速连续点击
-    if (isRegeneratingRef.current) {
-      setReGenerateError('正在再次创作中，请等待上一次完成')
-      return
-    }
-    
-    if (!word) return
-    const trimmedWord = String(word).trim()
-    if (!trimmedWord) return
-
-    // 设置生成状态（同时更新 state 和 ref）
-    isRegeneratingRef.current = true
-    setReGenerating(true)
-    setReGenerateError('')
-    
-    try {
-      const deviceId = getDeviceId()
-      await ensureNickname()
-
-      const response = await fetch('/api/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ words: trimmedWord, deviceId }),
-        // 保证即使用户离开当前页，请求也尽量继续进行
-        keepalive: true as any,
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        // 更新本地 myStories（我的创作页使用）
-        try {
-          const savedStories = JSON.parse(localStorage.getItem('myStories') || '[]')
-          const newStories = [data.story, ...savedStories]
-          localStorage.setItem('myStories', JSON.stringify(newStories))
-        } catch {
-          // ignore localStorage errors
-        }
-
-        // 如果还在当前阅读页，更新当前字的故事列表，把新故事插到最前面
-        setStories((prev) => [data.story as Story, ...prev])
-        setCurrentStoryIndex(0)
-        setViewedIndices(new Set([0]))
-      } else {
-        setReGenerateError(data.error || '再次创作失败')
-      }
-    } catch (e) {
-      console.error('Regenerate story error:', e)
-      setReGenerateError('网络错误，请稍后重试')
-    } finally {
-      isRegeneratingRef.current = false
-      setReGenerating(false)
-    }
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 transition-colors duration-300">
@@ -310,18 +247,6 @@ function ReadPageContent() {
                     </select>
                   </div>
                 )}
-                {stories.length > 0 && (
-                  <motion.button
-                    onClick={handleRegenerate}
-                    disabled={reGenerating}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-sm hover:from-blue-600 hover:to-purple-600 transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
-                    whileHover={!reGenerating ? { scale: 1.05 } : {}}
-                    whileTap={!reGenerating ? { scale: 0.95 } : {}}
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    <span>{reGenerating ? '再次创作中...' : '再次创作'}</span>
-                  </motion.button>
-                )}
               </div>
             </div>
 
@@ -351,11 +276,6 @@ function ReadPageContent() {
               </div>
             )}
 
-            {reGenerateError && (
-              <p className="mt-2 text-sm text-red-500 dark:text-red-400">
-                {reGenerateError}
-              </p>
-            )}
           </div>
         </motion.header>
 

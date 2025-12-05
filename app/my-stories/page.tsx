@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Sparkles, BookOpen } from 'lucide-react'
 import TopBar from '@/components/TopBar'
@@ -10,10 +10,14 @@ import ReadingSettings from '@/components/ReadingSettings'
 import { Story } from '@/types/story'
 import { formatDate, isLiked } from '@/lib/utils'
 import { getDeviceId } from '@/lib/deviceId'
+import { ensureNickname } from '@/lib/nickname'
 
 export default function MyStoriesPage() {
   const [myStories, setMyStories] = useState<Story[]>([])
   const [loading, setLoading] = useState(true)
+  const [reGenerating, setReGenerating] = useState<Map<string, boolean>>(new Map())
+  const [reGenerateError, setReGenerateError] = useState<Map<string, string>>(new Map())
+  const isRegeneratingRef = useRef<Map<string, boolean>>(new Map())
 
   // Load my stories from localStorage
   useEffect(() => {
@@ -41,6 +45,68 @@ export default function MyStoriesPage() {
     )
     setMyStories(updatedStories)
     localStorage.setItem('myStories', JSON.stringify(updatedStories))
+  }
+
+  // 再次创作故事
+  const handleRegenerate = async (story: Story) => {
+    const storyId = story.id
+    const words = story.words
+    
+    // 使用 ref 确保原子性检查，防止快速连续点击
+    if (isRegeneratingRef.current.get(storyId)) {
+      setReGenerateError(prev => new Map(prev).set(storyId, '正在再次创作中，请等待上一次完成'))
+      return
+    }
+    
+    if (!words || words.trim().length === 0) {
+      return
+    }
+
+    const trimmedWord = words.trim()
+
+    // 设置生成状态（同时更新 state 和 ref）
+    isRegeneratingRef.current.set(storyId, true)
+    setReGenerating(prev => new Map(prev).set(storyId, true))
+    setReGenerateError(prev => {
+      const newMap = new Map(prev)
+      newMap.delete(storyId)
+      return newMap
+    })
+    
+    try {
+      const deviceId = getDeviceId()
+      await ensureNickname()
+
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ words: trimmedWord, deviceId }),
+        keepalive: true as any,
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        // 更新本地 myStories，将新故事插入到顶部
+        const newStories = [data.story as Story, ...myStories]
+        setMyStories(newStories)
+        localStorage.setItem('myStories', JSON.stringify(newStories))
+      } else {
+        setReGenerateError(prev => new Map(prev).set(storyId, data.error || '再次创作失败'))
+      }
+    } catch (e) {
+      console.error('Regenerate story error:', e)
+      setReGenerateError(prev => new Map(prev).set(storyId, '网络错误，请稍后重试'))
+    } finally {
+      isRegeneratingRef.current.set(storyId, false)
+      setReGenerating(prev => {
+        const newMap = new Map(prev)
+        newMap.delete(storyId)
+        return newMap
+      })
+    }
   }
 
   const handleLike = async (storyId: string, currentLikes: number) => {
@@ -145,6 +211,9 @@ export default function MyStoriesPage() {
                   formatDate={formatDate}
                   index={index}
                   onImageGenerated={handleImageGenerated}
+                  onRegenerate={handleRegenerate}
+                  isRegenerating={reGenerating.get(story.id) || false}
+                  regenerateError={reGenerateError.get(story.id)}
                 />
               ))}
             </AnimatePresence>
