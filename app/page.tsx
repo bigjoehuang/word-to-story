@@ -8,6 +8,7 @@ import Navigation from '@/components/Navigation'
 import StoryCard from '@/components/StoryCard'
 import GenerationProgress from '@/components/GenerationProgress'
 import ReadingSettings from '@/components/ReadingSettings'
+import Confetti from '@/components/Confetti'
 import { Story } from '@/types/story'
 import { formatDate, isLiked } from '@/lib/utils'
 import { getDeviceId } from '@/lib/deviceId'
@@ -63,6 +64,7 @@ export default function Home() {
   const [error, setError] = useState('')
   const [dailyLimit, setDailyLimit] = useState({ limit: 5, used: 0, remaining: 5 })
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [showConfetti, setShowConfetti] = useState(false)
   const [storyStyle, setStoryStyle] = useState<StoryStyle>('default')
   const [characterType, setCharacterType] = useState<CharacterType>('none')
   const [customCharacterName, setCustomCharacterName] = useState('')
@@ -190,6 +192,9 @@ export default function Home() {
         setLatestStory(data.story)
         setWords('')
         
+        // 触发撒花动画
+        setShowConfetti(true)
+        
         // Refresh daily limit
         const deviceId = getDeviceId()
         const limitResponse = await fetch(`/api/limit?deviceId=${encodeURIComponent(deviceId)}`)
@@ -269,6 +274,13 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 transition-colors duration-300">
       <TopBar />
       <ReadingSettings />
+      
+      {/* 撒花动画 */}
+      <AnimatePresence>
+        {showConfetti && (
+          <Confetti onComplete={() => setShowConfetti(false)} />
+        )}
+      </AnimatePresence>
       
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Header */}
