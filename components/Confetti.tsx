@@ -4,6 +4,113 @@ import { useEffect, useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Sparkles } from 'lucide-react'
 
+// 音效生成函数
+function playSoundEffect(type: 'ding' | 'biu' | 'pop' | 'chime' | 'sparkle') {
+  try {
+    // 检查浏览器是否支持 Web Audio API
+    if (typeof window === 'undefined' || (!window.AudioContext && !(window as any).webkitAudioContext)) {
+      return
+    }
+    
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+    const audioContext = new AudioContextClass()
+    
+    // 如果音频上下文被暂停（需要用户交互），尝试恢复
+    if (audioContext.state === 'suspended') {
+      audioContext.resume().catch(() => {
+        // 如果恢复失败，静默失败
+        return
+      })
+    }
+    
+    const oscillator = audioContext.createOscillator()
+    const gainNode = audioContext.createGain()
+    
+    oscillator.connect(gainNode)
+    gainNode.connect(audioContext.destination)
+    
+    // 根据类型设置不同的音效
+    switch (type) {
+      case 'ding': {
+        // 清脆的"叮"声 - 高音，快速衰减，轻微音量
+        oscillator.type = 'sine'
+        oscillator.frequency.setValueAtTime(800, audioContext.currentTime)
+        oscillator.frequency.exponentialRampToValueAtTime(1000, audioContext.currentTime + 0.1)
+        
+        gainNode.gain.setValueAtTime(0.15, audioContext.currentTime) // 降低音量
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3)
+        
+        oscillator.start(audioContext.currentTime)
+        oscillator.stop(audioContext.currentTime + 0.3)
+        break
+      }
+      
+      case 'biu': {
+        // 轻快的"biu"声 - 上升音调，轻微音量
+        oscillator.type = 'sine'
+        oscillator.frequency.setValueAtTime(400, audioContext.currentTime)
+        oscillator.frequency.exponentialRampToValueAtTime(1200, audioContext.currentTime + 0.2)
+        
+        gainNode.gain.setValueAtTime(0.12, audioContext.currentTime) // 降低音量
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.25)
+        
+        oscillator.start(audioContext.currentTime)
+        oscillator.stop(audioContext.currentTime + 0.25)
+        break
+      }
+      
+      case 'pop': {
+        // 爆裂声 - 短促的爆破音，轻微音量
+        oscillator.type = 'square'
+        oscillator.frequency.setValueAtTime(200, audioContext.currentTime)
+        oscillator.frequency.exponentialRampToValueAtTime(50, audioContext.currentTime + 0.1)
+        
+        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime) // 降低音量
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15)
+        
+        oscillator.start(audioContext.currentTime)
+        oscillator.stop(audioContext.currentTime + 0.15)
+        break
+      }
+      
+      case 'chime': {
+        // 钟声 - 柔和的音调，轻微音量
+        oscillator.type = 'sine'
+        oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime) // C5
+        
+        gainNode.gain.setValueAtTime(0.12, audioContext.currentTime) // 降低音量
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5)
+        
+        oscillator.start(audioContext.currentTime)
+        oscillator.stop(audioContext.currentTime + 0.5)
+        break
+      }
+      
+      case 'sparkle': {
+        // 闪烁音 - 快速的高音，轻微音量
+        oscillator.type = 'sine'
+        oscillator.frequency.setValueAtTime(1000, audioContext.currentTime)
+        oscillator.frequency.exponentialRampToValueAtTime(1500, audioContext.currentTime + 0.15)
+        
+        gainNode.gain.setValueAtTime(0.12, audioContext.currentTime) // 降低音量
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2)
+        
+        oscillator.start(audioContext.currentTime)
+        oscillator.stop(audioContext.currentTime + 0.2)
+        break
+      }
+    }
+    
+    // 清理资源
+    oscillator.onended = () => {
+      audioContext.close()
+    }
+  } catch (error) {
+    // 静默失败，不影响动画
+    console.debug('音效播放失败:', error)
+  }
+}
+
 interface ConfettiProps {
   onComplete?: () => void
 }
@@ -43,6 +150,34 @@ export default function Confetti({ onComplete }: ConfettiProps) {
     ]
     return effects[Math.floor(Math.random() * effects.length)]
   }, [])
+
+  // 根据效果类型选择匹配的音效
+  const soundType = useMemo<'ding' | 'biu' | 'pop' | 'chime' | 'sparkle'>(() => {
+    // 根据效果类型选择更匹配的音效
+    const soundMap: Record<EffectType, ('ding' | 'biu' | 'pop' | 'chime' | 'sparkle')[]> = {
+      'explosion': ['pop', 'ding'],
+      'rain': ['chime', 'sparkle'],
+      'rise': ['biu', 'sparkle'],
+      'spiral': ['chime', 'ding'],
+      'wave': ['sparkle', 'chime'],
+      'symmetric': ['ding', 'chime'],
+      'circle': ['chime', 'sparkle'],
+      'random': ['ding', 'biu', 'pop', 'chime', 'sparkle']
+    }
+    
+    const availableSounds = soundMap[effectType]
+    return availableSounds[Math.floor(Math.random() * availableSounds.length)]
+  }, [effectType])
+
+  // 播放音效
+  useEffect(() => {
+    // 延迟一点播放，让动画和音效更同步
+    const timer = setTimeout(() => {
+      playSoundEffect(soundType)
+    }, 50)
+    
+    return () => clearTimeout(timer)
+  }, [soundType])
 
   // 根据效果类型生成粒子配置
   const particles = useMemo(() => {
