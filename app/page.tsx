@@ -302,7 +302,9 @@ export default function Home() {
 
         {/* Input Form */}
         <motion.div 
-          className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 sm:p-8 mb-8 border border-gray-200 dark:border-gray-700"
+          className={`bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 sm:p-8 mb-8 border border-gray-200 dark:border-gray-700 transition-opacity ${
+            loading ? 'opacity-75' : ''
+          }`}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
@@ -346,9 +348,10 @@ export default function Home() {
                   <motion.button
                     type="button"
                     onClick={() => setWords('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
+                    disabled={loading}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    whileHover={loading ? {} : { scale: 1.1 }}
+                    whileTap={loading ? {} : { scale: 0.9 }}
                   >
                     <X className="w-5 h-5" />
                   </motion.button>
@@ -376,7 +379,8 @@ export default function Home() {
             <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
               <button
                 type="button"
-                className="text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1"
+                disabled={loading}
+                className="text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => setShowAdvanced((prev) => !prev)}
               >
                 高级设置
@@ -402,24 +406,26 @@ export default function Home() {
                         可以为故事指定1-3个角色，让AI围绕这些角色展开故事
                       </p>
                       <div className="space-y-2">
-                        <label className="flex items-center gap-2 cursor-pointer">
+                        <label className={`flex items-center gap-2 ${loading ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
                           <input
                             type="radio"
                             name="character-type"
                             value="none"
                             checked={characterType === 'none'}
                             onChange={() => setCharacterType('none')}
+                            disabled={loading}
                             className="accent-blue-500"
                           />
                           <span className="text-sm text-gray-700 dark:text-gray-300">不指定角色（AI自动生成）</span>
                         </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
+                        <label className={`flex items-center gap-2 ${loading ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
                           <input
                             type="radio"
                             name="character-type"
                             value="custom"
                             checked={characterType === 'custom'}
                             onChange={() => setCharacterType('custom')}
+                            disabled={loading}
                             className="accent-blue-500"
                           />
                           <span className="text-sm text-gray-700 dark:text-gray-300">自定义名字</span>
@@ -457,13 +463,14 @@ export default function Home() {
                             </p>
                           </div>
                         )}
-                        <label className="flex items-center gap-2 cursor-pointer">
+                        <label className={`flex items-center gap-2 ${loading ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
                           <input
                             type="radio"
                             name="character-type"
                             value="preset"
                             checked={characterType === 'preset'}
                             onChange={() => setCharacterType('preset')}
+                            disabled={loading}
                             className="accent-blue-500"
                           />
                           <span className="text-sm text-gray-700 dark:text-gray-300">选择系统角色</span>
@@ -476,6 +483,7 @@ export default function Home() {
                                 <button
                                   key={cat.id}
                                   type="button"
+                                  disabled={loading}
                                   onClick={() => {
                                     setCharacterCategory(cat.id)
                                     // 切换分类时不清除已选角色，允许跨分类选择
@@ -484,7 +492,7 @@ export default function Home() {
                                     characterCategory === cat.id
                                       ? 'bg-blue-500 text-white'
                                       : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                                  }`}
+                                  } disabled:opacity-50 disabled:cursor-not-allowed`}
                                 >
                                   {cat.name}
                                 </button>
@@ -531,7 +539,11 @@ export default function Home() {
                                   return (
                                     <label
                                       key={char.id}
-                                      className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors ${
+                                      className={`flex items-center gap-2 px-2 py-1.5 rounded transition-colors ${
+                                        loading || (!isSelected && selectedCharacterIds.length >= 3)
+                                          ? 'cursor-not-allowed opacity-50'
+                                          : 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600'
+                                      } ${
                                         isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                                       }`}
                                     >
@@ -581,10 +593,14 @@ export default function Home() {
                         {STORY_STYLES.map((style) => (
                           <label
                             key={style.id}
-                            className={`flex items-start gap-2 rounded-lg border px-3 py-2 cursor-pointer text-sm transition-colors ${
+                            className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                              loading
+                                ? 'cursor-not-allowed opacity-50'
+                                : 'cursor-pointer hover:border-blue-400 dark:hover:border-blue-400'
+                            } ${
                               storyStyle === style.id
                                 ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
-                                : 'border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-400'
+                                : 'border-gray-200 dark:border-gray-700'
                             }`}
                           >
                             <input
@@ -593,6 +609,7 @@ export default function Home() {
                               value={style.id}
                               checked={storyStyle === style.id}
                               onChange={() => setStoryStyle(style.id)}
+                              disabled={loading}
                               className="mt-1 accent-blue-500"
                             />
                             <div>
