@@ -111,7 +111,7 @@ export default function MyStoriesPage() {
             我的创作
           </h1>
           <p className="text-lg text-gray-600 dark:text-gray-300 mb-6">
-            查看你创作的所有故事
+            
           </p>
           <Navigation />
         </motion.header>

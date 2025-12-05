@@ -146,7 +146,7 @@ export default function ExplorePage() {
             探索故事
           </h1>
           <p className="text-lg text-gray-600 dark:text-gray-300 mb-6">
-            发现其他用户创作的精彩故事
+            
           </p>
           <Navigation />
         </motion.header>

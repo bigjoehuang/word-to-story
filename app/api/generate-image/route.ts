@@ -64,9 +64,10 @@ export async function POST(request: NextRequest) {
       const characterNames = story.character_name.trim().split(/\s+/).filter((n: string) => n.length > 0)
       
       // 检查是否是系统角色
-      const systemCharacters = characterNames
+      type Character = typeof ALL_CHARACTERS[0]
+      const systemCharacters: Character[] = characterNames
         .map((name: string) => ALL_CHARACTERS.find((char) => char.name === name))
-        .filter((char): char is typeof ALL_CHARACTERS[0] => char !== undefined)
+        .filter((char: Character | undefined): char is Character => char !== undefined)
       
       if (systemCharacters.length > 0) {
         // 如果是系统角色，明确指定角色外观和风格

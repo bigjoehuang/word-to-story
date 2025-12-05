@@ -67,19 +67,19 @@ const STORY_LENGTHS: {
     id: 'short',
     name: '短小精干',
     description: '简洁有力，快速传达核心思想，适合快速阅读',
-    range: '150-250字',
+    range: '',
   },
   {
     id: 'medium',
     name: '适中',
     description: '平衡长度与深度，有足够空间展开情节和思考（默认）',
-    range: '300-500字',
+    range: '',
   },
   {
     id: 'long',
     name: '较长',
     description: '更丰富的细节和情节，可以更深入地探讨主题',
-    range: '600-800字',
+    range: '',
   },
 ]
 
@@ -386,9 +386,7 @@ export default function Home() {
                   </motion.button>
                 )}
               </div>
-              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                已输入 {words.length} / 3 个字
-              </p>
+       
             </div>
             
             <AnimatePresence>
@@ -414,7 +412,7 @@ export default function Home() {
               >
                 高级设置
                 <span className="text-xs">
-                  {showAdvanced ? '（收起）' : '（选择角色和风格）'}
+                  {showAdvanced ? '（收起）' : ''}
                 </span>
               </button>
 
@@ -429,10 +427,10 @@ export default function Home() {
                     {/* Character Selection */}
                     <div className="space-y-2">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        角色（可选，1-3个）
+                        角色
                       </label>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        可以为故事指定1-3个角色，让AI围绕这些角色展开故事
+                        可以为故事指定1-3个角色，围绕这些角色展开故事
                       </p>
                       <div className="space-y-2">
                         <label className={`flex items-center gap-2 ${loading ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
@@ -445,7 +443,7 @@ export default function Home() {
                             disabled={loading}
                             className="accent-blue-500"
                           />
-                          <span className="text-sm text-gray-700 dark:text-gray-300">不指定角色（AI自动生成）</span>
+                          <span className="text-sm text-gray-700 dark:text-gray-300">不指定角色（自动生成）</span>
                         </label>
                         <label className={`flex items-center gap-2 ${loading ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
                           <input
@@ -457,7 +455,7 @@ export default function Home() {
                             disabled={loading}
                             className="accent-blue-500"
                           />
-                          <span className="text-sm text-gray-700 dark:text-gray-300">自定义名字</span>
+                          <span className="text-sm text-gray-700 dark:text-gray-300">自定义</span>
                         </label>
                         {characterType === 'custom' && (
                           <div className="ml-6 space-y-2">
@@ -615,9 +613,7 @@ export default function Home() {
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                         故事长度
                       </label>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        选择故事的长度，在保证质量和可读性的前提下调整篇幅。
-                      </p>
+             
                       <div className="grid gap-2 sm:grid-cols-3">
                         {STORY_LENGTHS.map((length) => (
                           <label
@@ -668,7 +664,7 @@ export default function Home() {
                         故事风格
                       </label>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        不同风格只是在语言氛围上略有侧重，都会保持「有趣又引人思考」的整体基调。
+                       
                       </p>
                       <div className="grid gap-2 sm:grid-cols-2">
                         {STORY_STYLES.map((style) => (
