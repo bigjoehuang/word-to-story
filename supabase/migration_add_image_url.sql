@@ -5,3 +5,5 @@ ALTER TABLE stories ADD COLUMN IF NOT EXISTS image_url TEXT;
 CREATE INDEX IF NOT EXISTS idx_stories_image_url ON stories(image_url) WHERE image_url IS NOT NULL;
 
 
+
+

@@ -27,3 +27,5 @@ CREATE POLICY "Allow public read generation times" ON generation_times
   USING (true);
 
 
+
+

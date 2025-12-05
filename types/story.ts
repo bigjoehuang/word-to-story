@@ -5,6 +5,7 @@ export interface Story {
   likes: number
   created_at: string
   image_url?: string | null
+  audio_url?: string | null
   user_id?: string
   author_nickname?: string | null
 }

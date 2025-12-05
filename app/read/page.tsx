@@ -13,6 +13,7 @@ import {
 import TopBar from '@/components/TopBar'
 import ReadingSettings from '@/components/ReadingSettings'
 import HighlightableText from '@/components/HighlightableText'
+import AudioPlayer from '@/components/AudioPlayer'
 import { Story } from '@/types/story'
 import { 
   useReadingSettings, 
@@ -44,6 +45,7 @@ function ReadPageContent() {
   const isRegeneratingRef = useRef(false)
   const { fontFamily, fontSize, theme, lineSpacing, letterSpacing } = useReadingSettings()
   const [isDarkMode, setIsDarkMode] = useState(false)
+  const [audioApiAvailable, setAudioApiAvailable] = useState<boolean | null>(null)
 
   // Detect dark mode
   useEffect(() => {
@@ -66,6 +68,23 @@ function ReadPageContent() {
       mediaQuery.removeEventListener('change', checkDarkMode)
       observer.disconnect()
     }
+  }, [])
+
+  // 检查音频API是否可用
+  useEffect(() => {
+    const checkAudioApi = async () => {
+      try {
+        const response = await fetch('/api/check-audio-api')
+        const data = await response.json()
+        // 确保正确处理响应数据，只有明确为true时才显示
+        const isAvailable = data.success === true && data.available === true
+        setAudioApiAvailable(isAvailable)
+      } catch (error) {
+        // 任何错误都认为API不可用
+        setAudioApiAvailable(false)
+      }
+    }
+    checkAudioApi()
   }, [])
 
   // Fetch stories for the word
@@ -388,6 +407,18 @@ function ReadPageContent() {
                   />
                 </div>
               </div>
+
+              {/* Audio Player - 仅在API配置时显示 */}
+              {/* 只有当 audioApiAvailable 明确为 true 时才显示，null 或 false 都不显示 */}
+              {audioApiAvailable === true && (
+                <div className="mt-6">
+                  <AudioPlayer
+                    storyId={currentStory.id}
+                    content={currentStory.content}
+                    audioUrl={currentStory.audio_url}
+                  />
+                </div>
+              )}
 
               {/* Story Meta */}
               <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700 flex flex-col gap-4">
