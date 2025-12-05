@@ -77,7 +77,7 @@ export default function GenerationProgress({ startTime, isGenerating }: Generati
       <div className="flex items-center gap-2 mb-2">
         <Sparkles className="w-4 h-4 text-purple-500 animate-pulse" />
         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-          AI正在创作中...
+          创作中...
         </span>
       </div>
       
