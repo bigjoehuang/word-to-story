@@ -10,21 +10,28 @@
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+# Publishable (anon) key - 在 Settings > API > Project API keys > anon public
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_publishable_key
+# Secret (service_role) key - 在 Settings > API > Project API keys > service_role secret
+SUPABASE_SERVICE_ROLE_KEY=your_secret_key
 ```
 
 **重要提示：**
 - URL 必须以 `https://` 开头
 - URL 格式应该是：`https://[project-ref].supabase.co`
 - 不要包含路径，例如 `/rest/v1/` 等
+- Publishable key 可以公开，用于客户端
+- Secret key 必须保密，仅用于服务端
 
-### 2. 验证 Supabase URL
+### 2. 验证 Supabase API Keys
 
 在 Supabase Dashboard 中：
 1. 进入 **Settings** → **API**
-2. 找到 **Project URL**
-3. 确保 URL 格式正确
+2. 找到 **Project URL**（项目 URL）
+3. 找到 **Project API keys**：
+   - **anon public** - 这是 Publishable key（用于客户端）
+   - **service_role secret** - 这是 Secret key（用于服务端，必须保密）
+4. 确保 URL 格式正确
 
 **正确的 URL 示例：**
 ```
@@ -83,6 +90,7 @@ npm run test:db
 - 错误消息的完整内容
 - `.env.local` 中的 URL（隐藏敏感部分）
 - 测试 API 的响应内容
+
 
 
 

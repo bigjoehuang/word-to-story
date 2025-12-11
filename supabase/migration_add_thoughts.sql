@@ -46,3 +46,4 @@ CREATE POLICY "Allow public delete thoughts" ON thoughts
 
 
 
+

@@ -31,17 +31,22 @@
 
 ```env
 # Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+# 在 Supabase Dashboard > Settings > API 中获取
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+# Publishable (anon) key - 用于客户端，可以公开
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_publishable_key
+# Secret (service_role) key - 用于服务端，必须保密
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_secret_key
 
 # DeepSeek API Configuration
+# 在 DeepSeek 控制台获取 API Key
 DEEPSEEK_API_KEY=your_deepseek_api_key
 
 # 豆包大模型 API Configuration (for image generation)
-DOUBAO_ACCESS_KEY=your_doubao_access_key
-DOUBAO_SECRET_KEY=your_doubao_secret_key
-DOUBAO_ENDPOINT_ID=your_doubao_endpoint_id
+# 使用Bearer token认证
+DOUBAO_API_KEY=your_doubao_api_key
+# 图片生成模型的endpoint ID
+DOUBAO_IMAGE_MODEL=your_doubao_image_model_endpoint_id
 ```
 
 ## 数据库设置
